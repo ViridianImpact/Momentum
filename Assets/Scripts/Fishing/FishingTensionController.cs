@@ -93,6 +93,10 @@ namespace Momentum.Fishing
         /// <summary>Raised when the player closes the result panel via the Done button.</summary>
         public event System.Action OnFightClosed;
 
+        /// <summary>Raised when a fight is WON, carrying the landed fish (its rarity drives rewards).
+        /// Fires the moment the fish is landed, before the Done button closes the panel.</summary>
+        public event System.Action<FishData> OnFishLanded;
+
         // ----------------------------------------------------------------- Runtime state
         enum State { Fighting, Won, Lost }
         State state;
@@ -260,6 +264,7 @@ namespace Momentum.Fishing
             string name = caughtSpecies != null ? caughtSpecies.displayName : fish.displayName;
             // Show the caught catfish's colour swatch alongside its name.
             ShowResult($"Landed {name}!", caughtSpecies);
+            OnFishLanded?.Invoke(fish);
         }
 
         void Lose()

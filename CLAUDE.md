@@ -7,11 +7,11 @@ repository.
 
 ## Project structure
 
-- **`./Momentum/` is the canonical project root and git repo root.** Confirmed via
-  `git rev-parse --show-toplevel`. Unity **2022.3.62f1** (LTS), Built-in Render Pipeline
-  (confirmed via Project Settings > Graphics: no URP asset assigned). `Assets/Scripts/Fishing/`
-  (all fishing game code) lives here. No nested duplication — `Momentum/` contains `Assets/`
-  directly.
+- **The repo root (this working directory) is the canonical Unity project root.** Confirmed
+  via `git rev-parse --show-toplevel`. Unity **6000.3.18f1** (Unity 6), Built-in Render
+  Pipeline (confirmed via Project Settings > Graphics: no URP asset assigned).
+  `Assets/Scripts/Fishing/` (all fishing game code) lives here. No nested duplication — the
+  root contains `Assets/` directly.
 
 ## Working in this codebase
 
@@ -40,7 +40,7 @@ Unity-Editor-driven project — no npm/make-style build, lint, or test toolchain
 From the CLI (substitute your installed Editor path):
 
 ```bash
-"<UnityEditor>" -runTests -batchmode -projectPath ./Momentum -testPlatform EditMode -testResults TestResults.xml
+"<UnityEditor>" -runTests -batchmode -projectPath . -testPlatform EditMode -testResults TestResults.xml
 ```
 
 Use `-testPlatform PlayMode` for play-mode tests. Run a single test/group with
@@ -51,14 +51,14 @@ Use `-testPlatform PlayMode` for play-mode tests. Run a single test/group with
 Once a build script and scenes exist:
 
 ```bash
-"<UnityEditor>" -batchmode -quit -projectPath ./Momentum -buildTarget StandaloneWindows64 -executeMethod <YourBuildClass.BuildMethod>
+"<UnityEditor>" -batchmode -quit -projectPath . -buildTarget StandaloneWindows64 -executeMethod <YourBuildClass.BuildMethod>
 ```
 
 ---
 
 ## Git — this IS a repo now
 
-Repo root is `Momentum/` itself (confirmed via `git rev-parse --show-toplevel`). Remote is
+Repo root is the Unity project root itself (confirmed via `git rev-parse --show-toplevel`). Remote is
 pushed to GitHub. `.gitignore` is Unity's standard template plus `.claude/` (Claude Code's
 local tool state — not project content, never commit it).
 

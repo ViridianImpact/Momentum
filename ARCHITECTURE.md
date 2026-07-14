@@ -48,6 +48,10 @@ it is purely a screen overlay.
 - `BeginFight()` — starts an encounter, shows overlay
 - `CloseFight()` — hides overlay, fires `OnFightClosed`
 - `event Action OnFightClosed` — fired on close
+- `event Action<FishData> OnFishLanded` — fired the moment a fight is WON (inside `Win()`,
+  before the Done button closes the panel), carrying the landed `FishData`. Its `rarity`
+  drives the coin reward. Added with explicit approval for the reward system; loss path is
+  untouched so losses signal nothing.
 - `bool autoStartOnPlay` — default `false`; keeps overlay hidden until triggered
 
 **Internals worth knowing:**
@@ -74,6 +78,23 @@ it is purely a screen overlay.
 **no** fight stats — identity only.
 
 ---
+
+### `PlayerWallet.cs` — coin reward logic
+`Assets/Scripts/Fishing/PlayerWallet.cs`. On the **`FishingTension`** GameObject (same object as
+the tension controller — `[RequireComponent(FishingTensionController)]`). Session-only coin
+balance (no saving/PlayerPrefs; resets to 0 each Play). Auto-subscribes to the controller's
+`OnFishLanded` in `OnEnable`, awards `PayoutFor(fish.rarity)`. Exposes `int Coins`,
+`AddCoins(int)`, `event Action<int,int> OnBalanceChanged (newTotal, delta)`, and the five
+per-rarity payout amounts as **public Inspector fields** (defaults: Common 10, Uncommon 25,
+Rare 60, Epic 150, Legendary 400). Wins only — losses award nothing.
+
+### `CoinHud.cs` — coin counter overlay
+`Assets/Scripts/Fishing/CoinHud.cs`. Also on **`FishingTension`** (`[RequireComponent(PlayerWallet)]`).
+Its own always-visible `ScreenSpaceOverlay` canvas (`sortingOrder = 100`, above the fight
+overlay), built in code in the same `BuildUI` style as the tension controller. Top-left
+`Coins: N` counter that updates on `OnBalanceChanged`. On each award it floats a brief `+N`
+label upward and fades it out via a coroutine + `AnimationCurve` (the win result panel is
+protected code, so the `+N` is shown at the HUD, not on that panel).
 
 ### `TopDownController.cs` — active player controller
 On `Player`. Fixed-angle top-down movement (legacy Input). WASD on screen-relative world
