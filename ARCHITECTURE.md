@@ -56,6 +56,22 @@ it is purely a screen overlay.
   the null-guard at the top of `Update()`. Do not remove that guard.
 - Result panel has a **Done** button → `CloseFight()`. There is deliberately **no Retry
   button** — a new encounter starts by clicking the water again.
+- On win, the result panel now shows the caught **catfish species' name + a flat colour
+  swatch** (`resultSwatch`, hidden on loss). Species identity is picked in `ResetFight()`
+  via `CatfishSpecies.PickRandom()` and is **display-only** — it does not affect fight
+  stats (all catfish use the same `FishData`, so difficulty is unchanged). Private fields
+  `resultSwatch` / `caughtSpecies`; no public API change.
+
+### `FishData.cs`
+`Assets/Scripts/Fishing/FishData.cs`. Plain `[Serializable]` data for the fight mechanics
+(`displayName`, `effortFrequency`, `effortIntensity`, `progressPerReel`, `rarity`) plus the
+`FishRarity` enum. Drives all tension/HP behaviour; not species content.
+
+### `CatfishSpecies.cs`
+`Assets/Scripts/Fishing/CatfishSpecies.cs`. Content layer: the 3 catchable catfish
+(**Whiskers / Old Tom / Spotmouth**) as name + swatch colour. Plain C# (no ScriptableObject).
+`static Catalogue` holds the entries; `static PickRandom()` selects one per fight. Carries
+**no** fight stats — identity only.
 
 ---
 

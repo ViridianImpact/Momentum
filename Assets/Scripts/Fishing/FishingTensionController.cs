@@ -122,6 +122,8 @@ namespace Momentum.Fishing
         GameObject hpRoot;
         GameObject resultPanel;
         Text resultText;
+        Image resultSwatch;             // flat-colour swatch showing the caught catfish's colour
+        CatfishSpecies caughtSpecies;   // display-only identity picked per fight (name + swatch colour)
 
         const float ScrollPerNotch = 0.1f; // Unity's "Mouse ScrollWheel" axis ~0.1 per notch
 
@@ -235,6 +237,10 @@ namespace Momentum.Fishing
                 ? fishCatalogue[Mathf.Clamp(startingFishIndex, 0, fishCatalogue.Count - 1)]
                 : new FishData();
 
+            // Display-only identity for this catch. Does NOT touch fight stats above —
+            // every catfish uses the same FishData, so difficulty is unchanged.
+            caughtSpecies = CatfishSpecies.PickRandom();
+
             playerReel = (safeZoneBottom + safeZoneTop) * 0.5f; // start centered in the green
             currentEffort = 0f;
             targetEffort = 0f;
@@ -251,7 +257,9 @@ namespace Momentum.Fishing
         void Win()
         {
             state = State.Won;
-            ShowResult($"Landed {fish.displayName}!");
+            string name = caughtSpecies != null ? caughtSpecies.displayName : fish.displayName;
+            // Show the caught catfish's colour swatch alongside its name.
+            ShowResult($"Landed {name}!", caughtSpecies);
         }
 
         void Lose()
@@ -260,12 +268,25 @@ namespace Momentum.Fishing
             // Lost in the bottom (orange) danger zone -> the fish shook free and dove.
             // Lost in the top (red) danger zone -> too much tension, the line broke.
             float bottom = Mathf.Min(safeZoneBottom, safeZoneTop);
-            ShowResult(displayedTension < bottom ? "The fish got away!" : "Line snapped!");
+            // No catch on a loss -> no swatch (species == null hides it).
+            ShowResult(displayedTension < bottom ? "The fish got away!" : "Line snapped!", null);
         }
 
-        void ShowResult(string message)
+        void ShowResult(string message, CatfishSpecies species = null)
         {
             resultText.text = message;
+            if (resultSwatch != null)
+            {
+                if (species != null)
+                {
+                    resultSwatch.color = species.swatchColor;
+                    resultSwatch.gameObject.SetActive(true);
+                }
+                else
+                {
+                    resultSwatch.gameObject.SetActive(false);
+                }
+            }
             resultPanel.SetActive(true);
         }
 
@@ -439,6 +460,17 @@ namespace Momentum.Fishing
             trt.pivot = new Vector2(0.5f, 0.5f);
             trt.anchoredPosition = new Vector2(0f, 70f);
             trt.sizeDelta = new Vector2(1000f, 160f);
+
+            // Caught-catfish colour swatch — sits just above the name, coloured per species
+            // on a win, hidden on a loss (see ShowResult). White placeholder until coloured.
+            resultSwatch = MakeImage("ResultSwatch", resultPanel.transform, Color.white);
+            var srt = resultSwatch.rectTransform;
+            srt.anchorMin = new Vector2(0.5f, 0.5f);
+            srt.anchorMax = new Vector2(0.5f, 0.5f);
+            srt.pivot = new Vector2(0.5f, 0.5f);
+            srt.anchoredPosition = new Vector2(0f, 200f);
+            srt.sizeDelta = new Vector2(96f, 96f);
+            resultSwatch.gameObject.SetActive(false);
 
             // Done: hide the overlay and return control to the walk scene (integration hook).
             // Starting a new encounter is done by clicking the water again (FishingSpotInteractor -> BeginFight).
