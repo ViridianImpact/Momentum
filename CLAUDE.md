@@ -7,16 +7,11 @@ repository.
 
 ## Project structure
 
-- **`./Momentum/` is the canonical, confirmed project root.** This is also the git repo
-  root (`git rev-parse --show-toplevel` → `.../Momentum`). Unity **2022.3.62f1** (LTS),
-  Built-in Render Pipeline (confirmed via Project Settings > Graphics: no URP asset assigned).
-  `Assets/Scripts/Fishing/` (all fishing game code) lives here, confirmed directly in
-  Explorer.
-- **There is no separate root-level project anymore.** An earlier duplicate nested folder,
-  `Momentum/Momentum/` — a stale, untouched copy of the original URP template (all files
-  dated 6/26/2026, before any fishing work began) — was found and deleted. If you ever see a
-  `Momentum/Momentum/` folder reappear, it is not supposed to exist; delete it rather than
-  treating it as a second project.
+- **`./Momentum/` is the canonical project root and git repo root.** Confirmed via
+  `git rev-parse --show-toplevel`. Unity **2022.3.62f1** (LTS), Built-in Render Pipeline
+  (confirmed via Project Settings > Graphics: no URP asset assigned). `Assets/Scripts/Fishing/`
+  (all fishing game code) lives here. No nested duplication — `Momentum/` contains `Assets/`
+  directly.
 
 ## Working in this codebase
 
