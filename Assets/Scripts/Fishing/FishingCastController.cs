@@ -157,6 +157,13 @@ namespace Momentum.Fishing
             StartCoroutine(CastRoutine(target, onLanded));
         }
 
+        /// <summary>Set the lure's colour. Persists through cast/fight/return because the lure
+        /// material is created once in BuildViewModel and never reset. Used by the lure shop.</summary>
+        public void SetLureColor(Color color)
+        {
+            if (lureMat != null) lureMat.color = color;
+        }
+
         /// <summary>Retract the lure back to the rod tip and return the rod to its idle pose.
         /// Call after the fight closes (OnFightClosed).</summary>
         public void ReturnToRest()

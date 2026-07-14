@@ -32,6 +32,7 @@
 | `Player/CharacterVisual/BodyCapsule` | Capsule primitive, scale `(1,0.9,1)` → ~1.8 tall | Placeholder character body. **Collider stripped** (never blocks the cast raycast). |
 | `Player/CharacterVisual/Nose` | Cube primitive @ local `(0,0.25,0.45)` | Small forward-facing indicator so facing is readable from above. **Collider stripped.** |
 | `Main Camera` | Camera | **Unparented (scene root)**, fixed rotation `(55,0,0)` pitched down, positioned behind/above the player. Retains `MainCamera` tag + `AudioListener`. Follows the player via `TopDownCameraFollow`; **rotation never changes at runtime**. The cast view-model is NO LONGER parented here (now on `CharacterVisual`). |
+| `LureShop` | Empty GameObject @ `(0,0.3,13)` | Far (over-water) end of the Dock. Hosts `LureShop`; a trigger `BoxCollider` is added in code. The stand primitives (`ShopCounter`/`ShopPost`/`ShopSign`) + hint/panel canvas are all **built in code at runtime** — not authored in the scene. |
 
 ---
 
@@ -88,6 +89,24 @@ balance (no saving/PlayerPrefs; resets to 0 each Play). Auto-subscribes to the c
 per-rarity payout amounts as **public Inspector fields** (defaults: Common 10, Uncommon 25,
 Rare 60, Epic 150, Legendary 400). Wins only — losses award nothing.
 
+### `LureShop.cs` — dockside lure shop
+`Assets/Scripts/Fishing/LureShop.cs` (namespace `Momentum.Fishing`). On the `LureShop`
+GameObject. **Self-contained, all in code**: builds its own stand primitives + trigger volume,
+a screen-space hint (`"Press E — Lure Shop"`) and shop panel (own `ScreenSpaceOverlay` canvas,
+`sortingOrder = 90` — below `CoinHud` so the balance stays on top), and holds session-only
+purchase/equip state (no saving). References (`PlayerWallet`, `TopDownController`,
+`FishingCastController`, `FishingSpotInteractor`) **auto-wire** via `FindFirstObjectByType` but
+are Inspector-overridable. Lure stock is a **public `LureOption[]`** (name/price/colour/ownedByDefault) —
+prices & colours tunable in the Inspector. Defaults: Blue (free, owned, default), Red 50,
+Purple 150, Gold 400.
+- Trigger `OnTriggerEnter/Exit` (fires from the player's CharacterController) → shows the hint
+  when in range **and** free (`player.ControlEnabled`). Walking out closes an open shop.
+- `E` opens/closes; open locks movement (`SetControlEnabled(false)`) **and disables the
+  `FishingSpotInteractor`** so panel clicks can't fall through to a water cast. Opening is
+  refused when `!player.ControlEnabled` (mid-cast/fight).
+- Buy → `PlayerWallet.TrySpend`, mark owned, auto-equip. Unaffordable → button disabled.
+  Equip → `FishingCastController.SetLureColor` (colour persists through cast→fight→return).
+
 ### `CoinHud.cs` — coin counter overlay
 `Assets/Scripts/Fishing/CoinHud.cs`. Also on **`FishingTension`** (`[RequireComponent(PlayerWallet)]`).
 Its own always-visible `ScreenSpaceOverlay` canvas (`sortingOrder = 100`, above the fight
@@ -103,6 +122,8 @@ gravity kept via the existing `CharacterController`. `bodyVisual` (CharacterVisu
 face the movement direction (exposed `turnSpeed`). **Cursor is visible/unlocked at all times.**
 Exposes the same `SetControlEnabled(bool)` lock the old `FirstPersonController` had, plus
 `FaceTowards(Vector3)` so the interactor can turn the character toward the cast point.
+**Added for the lure shop (approved edit):** read-only `public bool ControlEnabled` getter — lets
+the shop tell when the player is free (not mid-cast/fight) before opening. No behaviour changed.
 
 ### `TopDownCameraFollow.cs`
 On `Main Camera`. Position-only smooth follow (`SmoothDamp`) of `target` (Player). **Never
@@ -158,6 +179,10 @@ point first (by the interactor), so the rod flings toward the target.
 **`ReturnToRest()`** — re-docks lure to rod tip, returns to idle.
 
 Cast timing and rod poses are **public fields**, exposed for feel tuning without code changes.
+
+**Added for the lure shop (approved edit):** `public void SetLureColor(Color)` — sets the lure
+material's colour. Persists through cast/fight/return because `lureMat` is created once and never
+reset. No existing behaviour changed.
 
 ---
 

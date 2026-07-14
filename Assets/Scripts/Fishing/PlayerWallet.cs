@@ -59,6 +59,20 @@ namespace Momentum.Fishing
             OnBalanceChanged?.Invoke(Coins, amount);
         }
 
+        /// <summary>Attempts to spend <paramref name="amount"/> coins. Deducts and notifies
+        /// listeners (with a negative delta) only if the balance can cover it; otherwise leaves
+        /// the balance untouched. Non-positive amounts always succeed and change nothing (free
+        /// items). Returns true if the purchase went through.</summary>
+        public bool TrySpend(int amount)
+        {
+            if (amount <= 0) return true;
+            if (Coins < amount) return false;
+            Coins -= amount;
+            Debug.Log($"[PlayerWallet] -{amount} coins (total {Coins}).");
+            OnBalanceChanged?.Invoke(Coins, -amount);
+            return true;
+        }
+
         /// <summary>Maps a fish rarity to its coin payout using the Inspector-tunable fields.</summary>
         public int PayoutFor(FishRarity rarity)
         {

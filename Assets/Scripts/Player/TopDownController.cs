@@ -56,6 +56,10 @@ namespace Momentum.Player
             controlEnabled = value;
         }
 
+        /// <summary>True when WASD movement is enabled (i.e. the player is free — not mid-cast,
+        /// not in a fight, shop not open). Read-only companion to SetControlEnabled.</summary>
+        public bool ControlEnabled => controlEnabled;
+
         /// <summary>Turn the body to face a world point (used at cast start so the rod flings the
         /// right way). Yaw only — ignores height difference.</summary>
         public void FaceTowards(Vector3 worldPoint)
