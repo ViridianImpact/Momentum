@@ -36,15 +36,27 @@ namespace Momentum.Fishing
             public Color color = Color.white;
             [Tooltip("Owned from the start (the default Blue lure).")]
             public bool ownedByDefault = false;
+
+            [Header("Species odds when equipped (weights, Catalogue order: Whiskers / Old Tom / Spotmouth)")]
+            [Tooltip("Relative weight for Whiskers (Common). Normalized at pick time — any non-negative number.")]
+            public float whiskersWeight = 70f;
+            [Tooltip("Relative weight for Old Tom (Uncommon).")]
+            public float oldTomWeight = 25f;
+            [Tooltip("Relative weight for Spotmouth (Rare).")]
+            public float spotmouthWeight = 5f;
         }
 
-        [Header("Shop stock (name / price / colour — tunable)")]
+        [Header("Shop stock (name / price / colour / species odds — tunable)")]
         public LureOption[] lures =
         {
-            new LureOption { displayName = "Blue",   price = 0,   color = new Color(0.25f, 0.55f, 0.95f), ownedByDefault = true },
-            new LureOption { displayName = "Red",    price = 50,  color = new Color(0.90f, 0.25f, 0.25f) },
-            new LureOption { displayName = "Purple", price = 150, color = new Color(0.62f, 0.28f, 0.85f) },
-            new LureOption { displayName = "Gold",   price = 400, color = new Color(0.95f, 0.80f, 0.25f) },
+            new LureOption { displayName = "Blue",   price = 0,   color = new Color(0.25f, 0.55f, 0.95f), ownedByDefault = true,
+                             whiskersWeight = 70f, oldTomWeight = 25f, spotmouthWeight =  5f },
+            new LureOption { displayName = "Red",    price = 50,  color = new Color(0.90f, 0.25f, 0.25f),
+                             whiskersWeight = 50f, oldTomWeight = 40f, spotmouthWeight = 10f },
+            new LureOption { displayName = "Purple", price = 150, color = new Color(0.62f, 0.28f, 0.85f),
+                             whiskersWeight = 30f, oldTomWeight = 45f, spotmouthWeight = 25f },
+            new LureOption { displayName = "Gold",   price = 400, color = new Color(0.95f, 0.80f, 0.25f),
+                             whiskersWeight = 15f, oldTomWeight = 40f, spotmouthWeight = 45f },
         };
 
         [Header("References (auto-wired if left empty)")]
@@ -246,7 +258,17 @@ namespace Momentum.Fishing
             if (i < 0 || i >= lures.Length || !owned[i]) return;
             equippedIndex = i;
             if (castController != null) castController.SetLureColor(lures[i].color);
+            ApplyLureOdds(lures[i]);
             RefreshPanel();
+        }
+
+        /// <summary>Pushes the equipped lure's species odds into CatfishSpecies. Order MUST match
+        /// the Catalogue (0=Whiskers, 1=Old Tom, 2=Spotmouth). Takes effect on the NEXT fight; a
+        /// fight already in progress read its odds at ResetFight and is unaffected.</summary>
+        void ApplyLureOdds(LureOption lure)
+        {
+            if (lure == null) return;
+            CatfishSpecies.SetActiveWeights(new[] { lure.whiskersWeight, lure.oldTomWeight, lure.spotmouthWeight });
         }
 
         void HandleBalanceChanged(int newTotal, int delta)

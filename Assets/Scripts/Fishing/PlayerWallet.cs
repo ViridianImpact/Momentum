@@ -6,7 +6,8 @@ namespace Momentum.Fishing
     /// <summary>
     /// Session-only coin wallet. Holds the player's coin balance (no saving / PlayerPrefs —
     /// resets to 0 every Play), and turns a won fight into a payout via the rarity->coins
-    /// mapping below. Attach next to <see cref="FishingTensionController"/>; it auto-wires
+    /// mapping below — keyed off the CAUGHT SPECIES' rarity (from OnFishLanded), not FishData.
+    /// Attach next to <see cref="FishingTensionController"/>; it auto-wires
     /// to that controller's OnFishLanded event in Awake().
     ///
     /// Payout amounts are public so they can be tuned in the Inspector without code changes.
@@ -44,10 +45,15 @@ namespace Momentum.Fishing
             if (fishing != null) fishing.OnFishLanded -= HandleFishLanded;
         }
 
-        void HandleFishLanded(FishData fish)
+        void HandleFishLanded(FishData fish, CatfishSpecies species)
         {
-            if (fish == null) return;
-            AddCoins(PayoutFor(fish.rarity));
+            // Payout is driven by the CAUGHT SPECIES' rarity (the same species shown on the result
+            // panel), not by FishData.rarity — every catfish shares one FishData, so that field is
+            // no longer the reward tier. FishData.rarity is intentionally left in place, just unused
+            // here. Fall back to it only if no species was supplied (defensive; shouldn't happen).
+            if (species == null && fish == null) return;
+            FishRarity rarity = species != null ? species.rarity : fish.rarity;
+            AddCoins(PayoutFor(rarity));
         }
 
         /// <summary>Adds coins to the balance and notifies listeners. Ignores non-positive amounts.</summary>

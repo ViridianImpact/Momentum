@@ -49,10 +49,12 @@ it is purely a screen overlay.
 - `BeginFight()` — starts an encounter, shows overlay
 - `CloseFight()` — hides overlay, fires `OnFightClosed`
 - `event Action OnFightClosed` — fired on close
-- `event Action<FishData> OnFishLanded` — fired the moment a fight is WON (inside `Win()`,
-  before the Done button closes the panel), carrying the landed `FishData`. Its `rarity`
-  drives the coin reward. Added with explicit approval for the reward system; loss path is
-  untouched so losses signal nothing.
+- `event Action<FishData, CatfishSpecies> OnFishLanded` — fired the moment a fight is WON
+  (inside `Win()`, before the Done button closes the panel), carrying the landed `FishData`
+  **and the caught `CatfishSpecies`**. The **species' `rarity`** now drives the coin reward
+  (not `FishData.rarity`). Passing the same `caughtSpecies` shown on the result panel makes
+  payout-vs-displayed-species mismatch structurally impossible. Added with explicit approval
+  (species param added later, also approved); loss path is untouched so losses signal nothing.
 - `bool autoStartOnPlay` — default `false`; keeps overlay hidden until triggered
 - `bool IsFightVisible` (get) — true while the overlay canvas is on screen (`BeginFight`→
   `CloseFight`), on win **and** loss. Read-only; added so `CoinHud` can hide the top-left
@@ -73,13 +75,22 @@ it is purely a screen overlay.
 ### `FishData.cs`
 `Assets/Scripts/Fishing/FishData.cs`. Plain `[Serializable]` data for the fight mechanics
 (`displayName`, `effortFrequency`, `effortIntensity`, `progressPerReel`, `rarity`) plus the
-`FishRarity` enum. Drives all tension/HP behaviour; not species content.
+`FishRarity` enum. Drives all tension/HP behaviour; not species content. **`rarity` no longer
+drives payout** (species rarity does now — see below) but is retained/unused, not removed.
 
 ### `CatfishSpecies.cs`
-`Assets/Scripts/Fishing/CatfishSpecies.cs`. Content layer: the 3 catchable catfish
-(**Whiskers / Old Tom / Spotmouth**) as name + swatch colour. Plain C# (no ScriptableObject).
-`static Catalogue` holds the entries; `static PickRandom()` selects one per fight. Carries
-**no** fight stats — identity only.
+`Assets/Scripts/Fishing/CatfishSpecies.cs`. Content + reward-tier layer: the 3 catchable
+catfish (**Whiskers=Common / Old Tom=Uncommon / Spotmouth=Rare**) as name + swatch colour
++ `FishRarity rarity`. Plain C# (no ScriptableObject). Carries **no fight stats** — every
+catfish still fights identically; rarity drives payout only.
+- `static Catalogue` — the entries. **Catalogue index order (0=Whiskers, 1=Old Tom,
+  2=Spotmouth) is canonical** — every weight table is indexed against it.
+- `static float[] ActiveWeights` (private) — current pick odds, one per entry. Default
+  **70/25/5** (heavily Whiskers), reproducing the old near-uniform-feel bias.
+- `static SetActiveWeights(IReadOnlyList<float>)` — swaps the odds (used by `LureShop.Equip`).
+  Null/wrong-length is ignored (odds unchanged). Takes effect on the NEXT fight.
+- `static PickWeightedIndex()` / `static PickRandom()` — weighted roll against `ActiveWeights`.
+  `PickRandom()` is called once per fight from `FishingTensionController.ResetFight()`.
 
 ---
 
@@ -87,7 +98,8 @@ it is purely a screen overlay.
 `Assets/Scripts/Fishing/PlayerWallet.cs`. On the **`FishingTension`** GameObject (same object as
 the tension controller — `[RequireComponent(FishingTensionController)]`). Session-only coin
 balance (no saving/PlayerPrefs; resets to 0 each Play). Auto-subscribes to the controller's
-`OnFishLanded` in `OnEnable`, awards `PayoutFor(fish.rarity)`. Exposes `int Coins`,
+`OnFishLanded` in `OnEnable`, awards `PayoutFor(species.rarity)` off the caught
+`CatfishSpecies` (falls back to `fish.rarity` only if no species is supplied). Exposes `int Coins`,
 `AddCoins(int)`, `event Action<int,int> OnBalanceChanged (newTotal, delta)`, and the five
 per-rarity payout amounts as **public Inspector fields** (defaults: Common 10, Uncommon 25,
 Rare 60, Epic 150, Legendary 400). Wins only — losses award nothing.
@@ -99,9 +111,13 @@ a screen-space hint (`"Press E — Lure Shop"`) and shop panel (own `ScreenSpace
 `sortingOrder = 90` — below `CoinHud` so the balance stays on top), and holds session-only
 purchase/equip state (no saving). References (`PlayerWallet`, `TopDownController`,
 `FishingCastController`, `FishingSpotInteractor`) **auto-wire** via `FindFirstObjectByType` but
-are Inspector-overridable. Lure stock is a **public `LureOption[]`** (name/price/colour/ownedByDefault) —
-prices & colours tunable in the Inspector. Defaults: Blue (free, owned, default), Red 50,
-Purple 150, Gold 400.
+are Inspector-overridable. Lure stock is a **public `LureOption[]`** (name/price/colour/ownedByDefault **+ per-species
+weights** `whiskersWeight`/`oldTomWeight`/`spotmouthWeight`) — all Inspector-tunable. Defaults:
+Blue (free, owned, default) 70/25/5, Red 50 → 50/40/10, Purple 150 → 30/45/25, Gold 400 →
+15/40/45. **Equipping a lure applies its weight table** via `CatfishSpecies.SetActiveWeights`
+(`ApplyLureOdds`), shifting species odds toward rarer (higher-paying) fish. Applies to the
+NEXT fight; a fight already running is unaffected. Blue's table is applied at `Start()` (the
+default-equip path).
 - Trigger `OnTriggerEnter/Exit` (fires from the player's CharacterController) → shows the hint
   when in range **and** free (`player.ControlEnabled`). Walking out closes an open shop.
 - `E` opens/closes; open locks movement (`SetControlEnabled(false)`) **and disables the
