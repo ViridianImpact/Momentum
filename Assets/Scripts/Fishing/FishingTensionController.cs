@@ -97,6 +97,11 @@ namespace Momentum.Fishing
         /// Fires the moment the fish is landed, before the Done button closes the panel.</summary>
         public event System.Action<FishData> OnFishLanded;
 
+        /// <summary>True while the fight overlay canvas is on screen (BeginFight -> CloseFight), on
+        /// both the win and loss paths. Lets an external HUD hide itself while the overlay is up.
+        /// Read-only; no behaviour change.</summary>
+        public bool IsFightVisible => uiRoot != null && uiRoot.activeSelf;
+
         // ----------------------------------------------------------------- Runtime state
         enum State { Fighting, Won, Lost }
         State state;

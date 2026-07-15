@@ -15,7 +15,7 @@
 | Render pipeline | **Built-in RP** (`Standard` shader). NOT URP. |
 | Input | **Legacy Input Manager**. NOT the new Input System. |
 | Active scene | `Sandbox` |
-| Namespace | `Momentum.Fishing` |
+| Namespaces | `Momentum.Fishing` (fishing systems, `Assets/Scripts/Fishing/`); `Momentum.Player` (player controllers, `Assets/Scripts/Player/`) |
 | Tweening/animation | Coroutines + `AnimationCurve` only. No packages. |
 
 ---
@@ -54,6 +54,9 @@ it is purely a screen overlay.
   drives the coin reward. Added with explicit approval for the reward system; loss path is
   untouched so losses signal nothing.
 - `bool autoStartOnPlay` — default `false`; keeps overlay hidden until triggered
+- `bool IsFightVisible` (get) — true while the overlay canvas is on screen (`BeginFight`→
+  `CloseFight`), on win **and** loss. Read-only; added so `CoinHud` can hide the top-left
+  counter while the overlay is up. No behaviour change.
 
 **Internals worth knowing:**
 - `ResetFight()` — **not dead code.** Called by `BeginFight()` and the `autoStartOnPlay` path.
@@ -111,11 +114,19 @@ Purple 150, Gold 400.
 `Assets/Scripts/Fishing/CoinHud.cs`. Also on **`FishingTension`** (`[RequireComponent(PlayerWallet)]`).
 Its own always-visible `ScreenSpaceOverlay` canvas (`sortingOrder = 100`, above the fight
 overlay), built in code in the same `BuildUI` style as the tension controller. Top-left
-`Coins: N` counter that updates on `OnBalanceChanged`. On each award it floats a brief `+N`
-label upward and fades it out via a coroutine + `AnimationCurve` (the win result panel is
-protected code, so the `+N` is shown at the HUD, not on that panel).
+`Coins: N` counter that updates on `OnBalanceChanged`.
+- **Hides during a fight:** polls `FishingTensionController.IsFightVisible` each frame and hides
+  the top-left counter while the overlay is up (win & loss), so it never overlaps the HP/tension
+  bars; re-shows on close with the post-award total.
+- **Win-result coin line:** on a positive-delta balance change (award = win; fires while the
+  result panel is already up), shows a centered `+N / Total: M` on its own canvas
+  (`sortingOrder 100`, above the overlay's `0`), in the result panel's dead space. Loss shows
+  none.
+- The old floating `+N`-near-the-HUD path (`ShowPopup`/`PopupRoutine`) is **superseded and no
+  longer called** (call site commented, methods kept per the never-delete rule).
 
 ### `TopDownController.cs` — active player controller
+`Assets/Scripts/Player/TopDownController.cs` (namespace `Momentum.Player`).
 On `Player`. Fixed-angle top-down movement (legacy Input). WASD on screen-relative world
 axes derived from the camera (W = away from camera, S = toward, A/D = screen left/right),
 gravity kept via the existing `CharacterController`. `bodyVisual` (CharacterVisual) turns to
@@ -138,6 +149,7 @@ locked, screen-center crosshair aim). Kept in the scene and repo but its compone
 ---
 
 ### `FishingSpotInteractor.cs`
+`Assets/Scripts/Player/FishingSpotInteractor.cs` (namespace `Momentum.Player`).
 On `Player`. The entry point for fishing.
 
 On LMB: raycasts **from the mouse cursor** (`cam.ScreenPointToRay(Input.mousePosition)`).

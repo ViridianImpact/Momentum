@@ -30,8 +30,12 @@ namespace Momentum.Fishing
             new Keyframe(0f, 0f), new Keyframe(0.15f, 1f), new Keyframe(1f, 0f));
 
         PlayerWallet wallet;
+        FishingTensionController fighting;
         Font uiFont;
         Text coinLabel;
+        GameObject counterPanel;      // top-left counter; hidden while the fight overlay is up
+        Text resultCoinLabel;         // centered "+N / Total: M" shown on the WIN result screen
+        bool wasFightVisible;
         Text popupLabel;
         RectTransform popupRect;
         Coroutine popupRoutine;
@@ -40,6 +44,7 @@ namespace Momentum.Fishing
         void Awake()
         {
             wallet = GetComponent<PlayerWallet>();
+            fighting = GetComponent<FishingTensionController>();
         }
 
         void OnEnable()
@@ -59,10 +64,49 @@ namespace Momentum.Fishing
             RefreshLabel(wallet != null ? wallet.Coins : 0);
         }
 
+        void Update()
+        {
+            // The top-left counter must not overlap the fight overlay's HP/tension bars, so it
+            // hides for the whole fight (win AND loss) and reappears when the overlay closes.
+            bool vis = fighting != null && fighting.IsFightVisible;
+            if (vis == wasFightVisible) return;
+            wasFightVisible = vis;
+
+            if (counterPanel != null) counterPanel.SetActive(!vis);
+
+            if (vis)
+            {
+                // Fight just opened — clear any stale win-result coin line.
+                if (resultCoinLabel != null) resultCoinLabel.gameObject.SetActive(false);
+            }
+            else
+            {
+                // Fight just closed (Done) — drop the result coins and re-render the counter
+                // with the current (post-award) total.
+                if (resultCoinLabel != null) resultCoinLabel.gameObject.SetActive(false);
+                RefreshLabel(wallet != null ? wallet.Coins : 0);
+            }
+        }
+
         void HandleBalanceChanged(int newTotal, int delta)
         {
             RefreshLabel(newTotal);
-            if (delta > 0) ShowPopup(delta);
+            // Awards only ever happen on a WIN, and by the time this fires the result panel is
+            // already on screen (OnFishLanded -> wallet.AddCoins -> here, all inside Win()), so a
+            // positive delta marks the win-result moment and newTotal is post-award.
+            if (delta > 0) ShowResultCoins(delta, newTotal);
+
+            // _deprecated_: old behaviour floated a "+N" beside the top-left HUD. Superseded on
+            // wins by the centered result-screen display above; kept (not deleted) per the
+            // never-delete rule. ShowPopup/PopupRoutine remain below, just no longer called.
+            // if (delta > 0) ShowPopup(delta);
+        }
+
+        void ShowResultCoins(int delta, int newTotal)
+        {
+            if (resultCoinLabel == null) return;
+            resultCoinLabel.text = $"+{delta} coins\nTotal: {newTotal}";
+            resultCoinLabel.gameObject.SetActive(true);
         }
 
         void RefreshLabel(int total)
@@ -116,6 +160,7 @@ namespace Momentum.Fishing
 
             // --- Counter panel (top-left) ---------------------------------------------------
             var panel = MakeImage("CoinPanel", root, new Color(0.10f, 0.12f, 0.16f, 0.85f));
+            counterPanel = panel.gameObject;
             var prt = panel.rectTransform;
             prt.anchorMin = new Vector2(0f, 1f);
             prt.anchorMax = new Vector2(0f, 1f);
@@ -138,6 +183,17 @@ namespace Momentum.Fishing
             popupHome = cornerMargin + new Vector2(12f, -panelSize.y - 6f);
             popupRect.anchoredPosition = popupHome;
             popupLabel.gameObject.SetActive(false);
+
+            // --- Win-result coin line (centered, sits in the result panel's dead space between
+            // the species name and the Done button). This canvas is sortingOrder 100, above the
+            // fight overlay (sortingOrder 0), so it reads as part of the result moment. -------
+            resultCoinLabel = MakeText("ResultCoins", root, "", 36, TextAnchor.MiddleCenter,
+                new Color(1f, 0.87f, 0.35f));
+            var rcr = resultCoinLabel.rectTransform;
+            rcr.anchorMin = rcr.anchorMax = rcr.pivot = new Vector2(0.5f, 0.5f);
+            rcr.sizeDelta = new Vector2(600f, 70f);
+            rcr.anchoredPosition = new Vector2(0f, -5f);
+            resultCoinLabel.gameObject.SetActive(false);
         }
 
         Image MakeImage(string name, Transform parent, Color color)
