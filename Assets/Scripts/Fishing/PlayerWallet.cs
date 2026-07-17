@@ -4,9 +4,11 @@ using UnityEngine;
 namespace Momentum.Fishing
 {
     /// <summary>
-    /// Session-only coin wallet. Holds the player's coin balance (no saving / PlayerPrefs —
-    /// resets to 0 every Play), and turns a won fight into a payout via the rarity->coins
-    /// mapping below — keyed off the CAUGHT SPECIES' rarity (from OnFishLanded), not FishData.
+    /// Coin wallet. Holds the player's coin balance and turns a won fight into a payout via the
+    /// rarity->coins mapping below. The wallet itself does no file I/O; persistence is layered on
+    /// externally by SaveService (which restores via <see cref="RestoreBalance"/> on load and saves
+    /// on <see cref="OnBalanceChanged"/>). Payout is keyed off the CAUGHT SPECIES' rarity (from
+    /// OnFishLanded), not FishData.
     /// Attach next to <see cref="FishingTensionController"/>; it auto-wires
     /// to that controller's OnFishLanded event in Awake().
     ///
@@ -77,6 +79,16 @@ namespace Momentum.Fishing
             Debug.Log($"[PlayerWallet] -{amount} coins (total {Coins}).");
             OnBalanceChanged?.Invoke(Coins, -amount);
             return true;
+        }
+
+        /// <summary>Restores the balance to an exact amount on load, WITHOUT registering an award.
+        /// Fires OnBalanceChanged with a delta of 0 so listeners refresh their totals (the top-left
+        /// counter, the shop balance) but the CoinHud win "+N" line — which triggers only on a
+        /// positive delta — stays hidden. Additive hook for SaveService; not used during play.</summary>
+        public void RestoreBalance(int amount)
+        {
+            Coins = Mathf.Max(0, amount);
+            OnBalanceChanged?.Invoke(Coins, 0);
         }
 
         /// <summary>Maps a fish rarity to its coin payout using the Inspector-tunable fields.</summary>

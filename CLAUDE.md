@@ -17,9 +17,9 @@ repository.
 
 Unity-Editor-driven project — no npm/make-style build, lint, or test toolchain.
 
-- Source of truth: `Assets/`, `Packages/manifest.json`, `ProjectSettings/` (within whichever
-  project is canonical). `Library/`, `Temp/`, `Logs/`, `obj/` are generated/disposable —
-  never edit them.
+- Source of truth: `Assets/`, `Packages/manifest.json`, `ProjectSettings/` (at the repo root —
+  the canonical project; there is no nested `Momentum/` project). `Library/`, `Temp/`, `Logs/`,
+  `obj/` are generated/disposable — never edit them.
 - Every asset has a paired `.meta` file holding its GUID. When creating/moving/deleting
   assets by hand, keep the `.meta` in sync, or Unity reassigns GUIDs and silently breaks
   scene/prefab references.
@@ -28,11 +28,9 @@ Unity-Editor-driven project — no npm/make-style build, lint, or test toolchain
   not raw text edits.
 - Match the Editor version when opening a project; opening with a different Unity version
   forces a full asset re-import.
-- Rendering pipeline: **confirm which one is live before writing shader/material code** —
-  see unresolved item #1. If URP: use URP-compatible shaders/APIs, pipeline assets are under
-  `Assets/Settings/` (`URP-Balanced`, `URP-Performant`, `URP-HighFidelity`). If Built-in: use
-  `Standard` shader; `Shader.Find` on URP shader names returns null and will produce a
-  magenta/crash.
+- Rendering pipeline: **Built-in RP — confirmed** (Project Settings > Graphics: no URP asset
+  assigned; corroborated by `ARCHITECTURE.md`). Use the `Standard` shader. `Shader.Find` on URP
+  shader names returns null at runtime and produces a magenta/crash, so do **not** use them.
 
 ### Running tests (Unity Test Framework)
 

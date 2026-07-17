@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -20,7 +22,8 @@ namespace Momentum.Fishing
     ///   - Buying deducts coins via PlayerWallet.TrySpend and auto-equips. Equipping sets the
     ///     lure colour in the world via FishingCastController.SetLureColor (persists through a
     ///     full cast -> fight -> return cycle). One lure equipped at a time.
-    ///   - Ownership / equipped state is session-only (no saving).
+    ///   - Ownership / equipped state is held here; SaveService persists it externally (restores
+    ///     via RestoreLoadout on load, saves on the OnLoadoutChanged event). The shop does no I/O.
     ///
     /// References auto-wire at runtime (FindFirstObjectByType) but can be overridden in the
     /// Inspector. Prices and colours are Inspector-tunable.
@@ -76,6 +79,25 @@ namespace Momentum.Fishing
         int equippedIndex = -1;
         bool playerInRange;
         bool isOpen;
+
+        /// <summary>Raised whenever ownership or the equipped lure changes (buy, equip, or a
+        /// restore). Fired from <see cref="Equip"/>, which every ownership/equip change funnels
+        /// through. Additive hook for SaveService (save-on-change); no play behaviour depends on it.</summary>
+        public event Action OnLoadoutChanged;
+
+        /// <summary>Display names of every currently-owned lure, in stock order. For SaveService.</summary>
+        public IEnumerable<string> OwnedLureNames
+        {
+            get
+            {
+                for (int i = 0; i < lures.Length; i++)
+                    if (owned != null && i < owned.Length && owned[i]) yield return lures[i].displayName;
+            }
+        }
+
+        /// <summary>Display name of the equipped lure, or null if none. For SaveService.</summary>
+        public string EquippedLureName =>
+            (equippedIndex >= 0 && equippedIndex < lures.Length) ? lures[equippedIndex].displayName : null;
 
         // ---- UI refs ----
         Font uiFont;
@@ -260,6 +282,30 @@ namespace Momentum.Fishing
             if (castController != null) castController.SetLureColor(lures[i].color);
             ApplyLureOdds(lures[i]);
             RefreshPanel();
+            OnLoadoutChanged?.Invoke();
+        }
+
+        /// <summary>Restores owned + equipped state on load (SaveService). Marks every lure whose
+        /// name is in <paramref name="ownedNames"/> as owned (ownedByDefault lures are always kept
+        /// owned so the free default can never be lost), then equips <paramref name="equippedName"/>
+        /// — which re-applies that lure's colour AND species weight table via <see cref="Equip"/>.
+        /// Falls back to the first owned lure if the equipped name is missing or unowned. Meant to
+        /// run AFTER Start() has applied the Blue default, overriding it.</summary>
+        public void RestoreLoadout(IReadOnlyList<string> ownedNames, string equippedName)
+        {
+            if (owned == null || owned.Length != lures.Length) return;
+
+            for (int i = 0; i < lures.Length; i++)
+            {
+                bool inSave = ownedNames != null && ownedNames.Contains(lures[i].displayName);
+                owned[i] = inSave || lures[i].ownedByDefault; // never un-own a default lure
+            }
+
+            int equip = -1;
+            if (!string.IsNullOrEmpty(equippedName))
+                equip = Array.FindIndex(lures, l => l.displayName == equippedName);
+            if (equip < 0 || !owned[equip]) equip = Array.FindIndex(owned, o => o); // fall back to first owned
+            if (equip >= 0) Equip(equip);
         }
 
         /// <summary>Pushes the equipped lure's species odds into CatfishSpecies. Order MUST match

@@ -33,6 +33,7 @@
 | `Player/CharacterVisual/Nose` | Cube primitive @ local `(0,0.25,0.45)` | Small forward-facing indicator so facing is readable from above. **Collider stripped.** |
 | `Main Camera` | Camera | **Unparented (scene root)**, fixed rotation `(55,0,0)` pitched down, positioned behind/above the player. Retains `MainCamera` tag + `AudioListener`. Follows the player via `TopDownCameraFollow`; **rotation never changes at runtime**. The cast view-model is NO LONGER parented here (now on `CharacterVisual`). |
 | `LureShop` | Empty GameObject @ `(0,0.3,13)` | Far (over-water) end of the Dock. Hosts `LureShop`; a trigger `BoxCollider` is added in code. The stand primitives (`ShopCounter`/`ShopPost`/`ShopSign`) + hint/panel canvas are all **built in code at runtime** — not authored in the scene. |
+| `SaveService` | Empty GameObject @ origin | Hosts `SaveService`. No visuals. Persists coins + lure loadout to a JSON file; auto-wires `PlayerWallet`/`LureShop` in `Awake`. |
 
 ---
 
@@ -96,20 +97,23 @@ catfish still fights identically; rarity drives payout only.
 
 ### `PlayerWallet.cs` — coin reward logic
 `Assets/Scripts/Fishing/PlayerWallet.cs`. On the **`FishingTension`** GameObject (same object as
-the tension controller — `[RequireComponent(FishingTensionController)]`). Session-only coin
-balance (no saving/PlayerPrefs; resets to 0 each Play). Auto-subscribes to the controller's
-`OnFishLanded` in `OnEnable`, awards `PayoutFor(species.rarity)` off the caught
+the tension controller — `[RequireComponent(FishingTensionController)]`). Holds the coin
+balance; does **no file I/O itself** — `SaveService` persists it externally. Auto-subscribes to
+the controller's `OnFishLanded` in `OnEnable`, awards `PayoutFor(species.rarity)` off the caught
 `CatfishSpecies` (falls back to `fish.rarity` only if no species is supplied). Exposes `int Coins`,
 `AddCoins(int)`, `event Action<int,int> OnBalanceChanged (newTotal, delta)`, and the five
 per-rarity payout amounts as **public Inspector fields** (defaults: Common 10, Uncommon 25,
 Rare 60, Epic 150, Legendary 400). Wins only — losses award nothing.
+- **Added for save/load (approved additive hook):** `public void RestoreBalance(int)` — sets the
+  balance on load and fires `OnBalanceChanged` with a **delta of 0**, so the counter refreshes but
+  `CoinHud`'s win "+N" line (fires only on positive delta) stays hidden. No existing behaviour changed.
 
 ### `LureShop.cs` — dockside lure shop
 `Assets/Scripts/Fishing/LureShop.cs` (namespace `Momentum.Fishing`). On the `LureShop`
 GameObject. **Self-contained, all in code**: builds its own stand primitives + trigger volume,
 a screen-space hint (`"Press E — Lure Shop"`) and shop panel (own `ScreenSpaceOverlay` canvas,
-`sortingOrder = 90` — below `CoinHud` so the balance stays on top), and holds session-only
-purchase/equip state (no saving). References (`PlayerWallet`, `TopDownController`,
+`sortingOrder = 90` — below `CoinHud` so the balance stays on top), and holds the
+purchase/equip state (persisted externally by `SaveService`; the shop does no I/O). References (`PlayerWallet`, `TopDownController`,
 `FishingCastController`, `FishingSpotInteractor`) **auto-wire** via `FindFirstObjectByType` but
 are Inspector-overridable. Lure stock is a **public `LureOption[]`** (name/price/colour/ownedByDefault **+ per-species
 weights** `whiskersWeight`/`oldTomWeight`/`spotmouthWeight`) — all Inspector-tunable. Defaults:
@@ -125,6 +129,32 @@ default-equip path).
   refused when `!player.ControlEnabled` (mid-cast/fight).
 - Buy → `PlayerWallet.TrySpend`, mark owned, auto-equip. Unaffordable → button disabled.
   Equip → `FishingCastController.SetLureColor` (colour persists through cast→fight→return).
+- **Added for save/load (approved additive hooks):** `event Action OnLoadoutChanged` (fired from
+  `Equip`, which every buy/equip funnels through — `SaveService` saves on it); getters
+  `IEnumerable<string> OwnedLureNames` / `string EquippedLureName`; and `void RestoreLoadout(
+  IReadOnlyList<string> ownedNames, string equippedName)` — sets ownership by name (never un-owns a
+  `ownedByDefault` lure) then `Equip`s the saved lure, re-applying its colour **and** species weight
+  table. Meant to run **after** `Start()`'s Blue default, overriding it. No existing behaviour changed.
+
+### `SaveService.cs` — persistence layer
+`Assets/Scripts/Fishing/SaveService.cs` (namespace `Momentum.Fishing`). On the `SaveService`
+GameObject. **The only code that touches disk.** Writes one JSON file
+(`Application.persistentDataPath/momentum_save.json`, `JsonUtility`, pretty-printed) holding
+`schemaVersion` (currently 1), `coins`, `ownedLures` (names), `equippedLure` (name). Auto-wires
+`PlayerWallet` + `LureShop` in `Awake`.
+- **`[DefaultExecutionOrder(1000)]`** so its `Start()` runs **after** `LureShop.Start()` applies the
+  Blue default — the restore then overrides it. (Coin restore is order-independent; it's event-driven
+  and all `OnEnable` subscriptions exist before any `Start`.)
+- `Start()`: `Load()` → `wallet.RestoreBalance` + `lureShop.RestoreLoadout` under a `restoring`
+  guard, **then** subscribes to `OnBalanceChanged` / `OnLoadoutChanged` (so the restore itself can't
+  trigger a save).
+- `Save()` — writes current coins + loadout; **never throws** (try/catch → warning); logs the full
+  file path once on first save. `Load()` — returns defaults (0 coins, the `ownedByDefault` lure
+  owned+equipped) when the file is missing/unreadable/`null`; **never throws, never blocks Play**.
+  Unknown `schemaVersion` logs a warning and reads fields as-is.
+- Auto-saves on: coin balance change, lure purchase, lure equip. A plain fresh start writes **no**
+  file until the first actual change. Restore does **not** re-award (`RestoreBalance` zero-delta → no
+  `CoinHud` "+N") and does **not** re-save (guarded).
 
 ### `CoinHud.cs` — coin counter overlay
 `Assets/Scripts/Fishing/CoinHud.cs`. Also on **`FishingTension`** (`[RequireComponent(PlayerWallet)]`).
