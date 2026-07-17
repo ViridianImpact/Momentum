@@ -694,6 +694,7 @@ GameObject:
   - component: {fileID: 1045956037}
   - component: {fileID: 1045956041}
   - component: {fileID: 1045956042}
+  - component: {fileID: 1045956043}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -717,6 +718,7 @@ MonoBehaviour:
   fishing: {fileID: 406753450}
   player: {fileID: 1045956042}
   castController: {fileID: 0}
+  bite: {fileID: 0}
   waterMask:
     serializedVersion: 2
     m_Bits: 16
@@ -820,6 +822,33 @@ MonoBehaviour:
   bodyVisual: {fileID: 1335948343}
   turnSpeed: 720
   cam: {fileID: 137696663}
+--- !u!114 &1045956043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1045956036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97c5c6dc0c1851e40bf9d1e7f9a5174c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Momentum.Fishing.FishingBiteController
+  fishBiteChance: 85
+  nothingChance: 10
+  junkChance: 5
+  minWait: 1
+  maxWait: 5
+  readBeat: 0.7
+  bubbleLocalOffset: {x: 0, y: 2.1, z: 0}
+  bubbleScale: 1
+  characterVisual: {fileID: 0}
+  noCatchMessageDuration: 2
+  junkMessages:
+  - You reeled in a ball of yarn.
+  - You reeled in a scratching post.
+  - You reeled in a hairball.
+  nothingMessage: Nothing seems to be biting...
 --- !u!1 &1240822356
 GameObject:
   m_ObjectHideFlags: 0
@@ -1013,18 +1042,30 @@ MonoBehaviour:
     price: 0
     color: {r: 0.25, g: 0.55, b: 0.95, a: 1}
     ownedByDefault: 1
+    whiskersWeight: 70
+    oldTomWeight: 25
+    spotmouthWeight: 5
   - displayName: Red
     price: 50
     color: {r: 0.9, g: 0.25, b: 0.25, a: 1}
     ownedByDefault: 0
+    whiskersWeight: 50
+    oldTomWeight: 40
+    spotmouthWeight: 10
   - displayName: Purple
     price: 150
     color: {r: 0.62, g: 0.28, b: 0.85, a: 1}
     ownedByDefault: 0
+    whiskersWeight: 30
+    oldTomWeight: 45
+    spotmouthWeight: 25
   - displayName: Gold
     price: 400
     color: {r: 0.95, g: 0.8, b: 0.25, a: 1}
     ownedByDefault: 0
+    whiskersWeight: 15
+    oldTomWeight: 40
+    spotmouthWeight: 45
   wallet: {fileID: 0}
   player: {fileID: 0}
   castController: {fileID: 0}

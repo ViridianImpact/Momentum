@@ -27,7 +27,7 @@
 | `Ground` | Plane primitive | Shore. Player spawns here. |
 | `Water` | Plane primitive | Grey-blue `Standard` material. On the **Water layer** — this layer is how clicks are filtered. |
 | `Dock` | Cube primitive (scaled long/flat) | Brown. Walkable, has collider. Extends from shore over water. |
-| `Player` | Empty GameObject | Has `CharacterController` (height 2, center y=1), `TopDownController` (active), `FirstPersonController` (**disabled, not removed** — see below), `FishingSpotInteractor`, `FishingCastController`. |
+| `Player` | Empty GameObject | Has `CharacterController` (height 2, center y=1), `TopDownController` (active), `FirstPersonController` (**disabled, not removed** — see below), `FishingSpotInteractor`, `FishingCastController`, `FishingBiteController`. |
 | `Player/CharacterVisual` | Empty pivot @ local `(0,0.9,0)` | The body root that rotates to face movement/cast direction (`TopDownController.bodyVisual`). Also hosts the cast view-model (`FishingCastController.viewModelParent`). |
 | `Player/CharacterVisual/BodyCapsule` | Capsule primitive, scale `(1,0.9,1)` → ~1.8 tall | Placeholder character body. **Collider stripped** (never blocks the cast raycast). |
 | `Player/CharacterVisual/Nose` | Cube primitive @ local `(0,0.25,0.45)` | Small forward-facing indicator so facing is readable from above. **Collider stripped.** |
@@ -172,14 +172,54 @@ On LMB: raycasts **from the mouse cursor** (`cam.ScreenPointToRay(Input.mousePos
 If the **closest** hit is on the **Water layer** (dock/ground correctly occlude water), it:
 1. Turns the character to face the clicked point (`player.FaceTowards(hit.point)`)
 2. Locks player movement (`player.SetControlEnabled(false)`)
-3. Calls `castController.BeginCast(hit.point, fishing.BeginFight)`
-4. On `OnFightClosed`, calls `ReturnToRest()` and unlocks movement
+3. Calls `castController.BeginCast(hit.point, StartBiteOrFight)`. On landing `StartBiteOrFight`
+   hands off to `bite.BeginWait(fishing.BeginFight, HandleNoCatch)` (the **bite-wait phase**), or
+   — if no `FishingBiteController` is present — calls `fishing.BeginFight()` directly (old
+   behaviour).
+4. On `OnFightClosed` **or** the no-catch outcome (`HandleNoCatch`), calls the shared
+   `ReleaseFishing()` — clears the re-trigger guard, unlocks movement, and `ReturnToRest()`. The
+   no-catch path reuses this **exact** unlock so no fight ever has to start, and casting again
+   works immediately.
+
+`bite` (the `FishingBiteController`) auto-wires in `Awake()` via `GetComponent` (same pattern as
+`castController`); Inspector-overridable.
 
 `player` is now typed `TopDownController` (was `FirstPersonController`). The center crosshair
 (`drawCrosshair`) is disabled in the Inspector since aim is now the mouse cursor.
 Auto-wires the cast controller in `Awake()` via `GetComponent`; other refs set in Inspector.
 
 ---
+
+### `FishingBiteController.cs`
+`Assets/Scripts/Fishing/FishingBiteController.cs` (namespace `Momentum.Fishing`).
+On `Player`. The **bite-wait phase** inserted between the lure landing and the fight starting
+(Pokémon-encounter style). Built entirely in code; Coroutines + primitives only.
+
+**Public API:**
+- `BeginWait(Action onBite, Action onNoCatch)` — called by `FishingSpotInteractor` as the cast's
+  `onLanded` callback (instead of `fishing.BeginFight` directly). Rolls the outcome **once** up
+  front, then waits, then fires **either** `onBite` (fish → start the fight) **or** `onNoCatch`
+  (nothing/junk → return the line, unlock).
+
+**Behaviour:**
+- Outcome odds are **public Inspector fields**, normalized in code (need not sum to 100):
+  `fishBiteChance` (85), `nothingChance` (10), `junkChance` (5). Junk sub-rolls uniformly over
+  `junkMessages` (yarn / scratching post / hairball).
+- Wait is `Random.Range(minWait, maxWait)` (public, default 1–5s). Movement stays locked the whole
+  time (the interactor locked it before the cast).
+- **Fish:** after the wait, a "!" thought bubble pops above the head, holds for `readBeat`
+  (public, default 0.7s), hides, **then** `onBite` runs. No input required.
+- **Nothing/junk:** waits the **FULL `maxWait`** (not the fish roll), shows a brief screen message
+  for `noCatchMessageDuration` (public, default 2s), then `onNoCatch` runs. Junk is **flavor text
+  ONLY** — no coins, no inventory, nothing spawned.
+
+**Visuals (built in code):**
+- Thought bubble: world-space, parented to `CharacterVisual` at `bubbleLocalOffset` (public,
+  default `(0,2.1,0)` — above the head). A white `Quad` backdrop + a `TextMesh` "!" (colliders
+  stripped). **Billboarded to `Camera.main` every `LateUpdate`** so it reads from the fixed
+  top-down angle. Hidden by default; shown at the bite, hidden before the overlay opens.
+- No-catch message: own `ScreenSpaceOverlay` canvas, `sortingOrder = 90` (**below** `CoinHud`'s
+  100), same code-built style as `CoinHud`/the tension overlay. Centered-lower panel.
 
 ### `FishingCastController.cs`
 On `Player`. The rod/arm view-model + cast animation. Built entirely in code.
@@ -223,11 +263,16 @@ Player clicks water (mouse cursor)
   → FishingCastController.BeginCast(hitPoint, callback)
       → windup → release → parabolic flight
       → lands exactly on hitPoint
-  → callback → FishingTensionController.BeginFight()
-      → overlay shows, tension minigame runs
-      → win/lose → result panel → Done button
-  → CloseFight() → OnFightClosed
-  → ReturnToRest() + movement unlocked
+  → callback → FishingBiteController.BeginWait(onBite, onNoCatch)  [bite-wait phase]
+      → rolls outcome once (85% fish / 10% nothing / 5% junk), waits 1–5s
+      → FISH: "!" bubble pops above head → read beat → onBite:
+           → FishingTensionController.BeginFight()
+               → overlay shows, tension minigame runs
+               → win/lose → result panel → Done button
+           → CloseFight() → OnFightClosed → ReleaseFishing()
+      → NOTHING/JUNK: full 5s wait → brief screen message → onNoCatch:
+           → HandleNoCatch() → ReleaseFishing()  (no fight ever started)
+  → ReleaseFishing(): movement unlocked + ReturnToRest()
   → player walks; click water again for a new encounter
 ```
 

@@ -28,6 +28,11 @@ namespace Momentum.Player
                  "rod plays a windup+fling and BeginFight() fires when the lure lands. " +
                  "If null, BeginFight() is called instantly (old behaviour).")]
         public FishingCastController castController;
+        [Tooltip("Bite-wait phase between the lure landing and the fight. If assigned (or found " +
+                 "on this GameObject), the lure waits for a bite before the fight starts, with a " +
+                 "chance of no catch. If null, the fight starts the instant the lure lands (old " +
+                 "behaviour).")]
+        public FishingBiteController bite;
 
         [Header("Water detection")]
         public LayerMask waterMask;
@@ -44,6 +49,7 @@ namespace Momentum.Player
         {
             if (cam == null) cam = Camera.main;
             if (castController == null) castController = GetComponent<FishingCastController>();
+            if (bite == null) bite = GetComponent<FishingBiteController>();
         }
 
         void OnEnable()
@@ -79,17 +85,45 @@ namespace Momentum.Player
                         player.SetControlEnabled(false);      // lock movement now (through the cast)
                     }
 
-                    // Play the cast animation, then start the fight when the lure lands.
-                    // Falls back to an instant BeginFight() if no cast controller is present.
+                    // Play the cast animation, then run the bite-wait phase when the lure lands.
+                    // The bite controller either starts the fight (bite) or returns the line with
+                    // no catch (which routes to HandleNoCatch -> the normal unlock path). If no
+                    // bite controller is present, the fight starts the instant the lure lands
+                    // (old behaviour). Falls back to an instant BeginFight if there's no cast
+                    // controller either.
                     if (castController != null)
-                        castController.BeginCast(hit.point, fishing.BeginFight);
+                        castController.BeginCast(hit.point, StartBiteOrFight);
                     else
-                        fishing.BeginFight();
+                        StartBiteOrFight();
                 }
             }
         }
 
+        // Runs when the lure lands: hand off to the bite-wait phase, or (no bite controller) start
+        // the fight immediately as before.
+        void StartBiteOrFight()
+        {
+            if (bite != null)
+                bite.BeginWait(fishing.BeginFight, HandleNoCatch);
+            else
+                fishing.BeginFight();
+        }
+
+        // No-catch outcome (nothing / junk): no fight ever started, so reuse the exact same
+        // unlock path the post-fight OnFightClosed handler uses.
+        void HandleNoCatch()
+        {
+            ReleaseFishing();
+        }
+
         void HandleFishingClosed()
+        {
+            ReleaseFishing();
+        }
+
+        // Shared unlock: clear the re-trigger guard, restore movement, and retract the lure. Used
+        // by both the post-fight close and the no-catch outcome so casting again works immediately.
+        void ReleaseFishing()
         {
             fishingActive = false;
             if (player != null) player.SetControlEnabled(true);
