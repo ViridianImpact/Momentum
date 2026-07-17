@@ -59,6 +59,12 @@ namespace Momentum.Fishing
         [Tooltip("Shown when nothing bites.")]
         public string nothingMessage = "Nothing seems to be biting...";
 
+        /// <summary>Additive telemetry hook: fired the instant the bite-wait outcome surfaces to the
+        /// player. Args: (outcomeKey, junkMessage) where outcomeKey is "fish" | "nothing" | "junk",
+        /// and junkMessage is the flavor line on a junk outcome (null otherwise). Invoke-only — no
+        /// gameplay behaviour depends on it. TelemetryService uses "fish" to also derive fight_start.</summary>
+        public event Action<string, string> OnBiteResolved;
+
         enum Outcome { Fish, Nothing, Junk }
 
         bool waiting;
@@ -118,6 +124,7 @@ namespace Momentum.Fishing
                 ShowBubble(false);             // gone before the overlay opens
 
                 waiting = false;
+                OnBiteResolved?.Invoke("fish", null); // telemetry: bite_outcome(fish) -> fight_start
                 onBite?.Invoke();              // -> FishingTensionController.BeginFight()
             }
             else
@@ -127,6 +134,9 @@ namespace Momentum.Fishing
                 yield return new WaitForSeconds(maxWait);
 
                 string msg = outcome == Outcome.Junk ? PickJunkMessage() : nothingMessage;
+                // telemetry: bite_outcome(nothing|junk); junk carries its flavor line, nothing does not
+                OnBiteResolved?.Invoke(outcome == Outcome.Junk ? "junk" : "nothing",
+                                       outcome == Outcome.Junk ? msg : null);
                 ShowMessage(msg, true);
                 yield return new WaitForSeconds(Mathf.Max(0f, noCatchMessageDuration));
                 ShowMessage(null, false);

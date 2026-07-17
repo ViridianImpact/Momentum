@@ -33,7 +33,7 @@
 | `Player/CharacterVisual/Nose` | Cube primitive @ local `(0,0.25,0.45)` | Small forward-facing indicator so facing is readable from above. **Collider stripped.** |
 | `Main Camera` | Camera | **Unparented (scene root)**, fixed rotation `(55,0,0)` pitched down, positioned behind/above the player. Retains `MainCamera` tag + `AudioListener`. Follows the player via `TopDownCameraFollow`; **rotation never changes at runtime**. The cast view-model is NO LONGER parented here (now on `CharacterVisual`). |
 | `LureShop` | Empty GameObject @ `(0,0.3,13)` | Far (over-water) end of the Dock. Hosts `LureShop`; a trigger `BoxCollider` is added in code. The stand primitives (`ShopCounter`/`ShopPost`/`ShopSign`) + hint/panel canvas are all **built in code at runtime** — not authored in the scene. |
-| `SaveService` | Empty GameObject @ origin | Hosts `SaveService`. No visuals. Persists coins + lure loadout to a JSON file; auto-wires `PlayerWallet`/`LureShop` in `Awake`. |
+| `SaveService` | Empty GameObject @ origin | Hosts `SaveService` **and `TelemetryService`**. No visuals. `SaveService` persists coins + lure loadout to a JSON file; `TelemetryService` appends a JSONL event log. Both auto-wire their refs in `Awake`. |
 
 ---
 
@@ -156,6 +156,27 @@ GameObject. **The only code that touches disk.** Writes one JSON file
   file until the first actual change. Restore does **not** re-award (`RestoreBalance` zero-delta → no
   `CoinHud` "+N") and does **not** re-save (guarded).
 
+### `TelemetryService.cs` — local JSONL event log
+`Assets/Scripts/Fishing/TelemetryService.cs` (namespace `Momentum.Fishing`). On the `SaveService`
+GameObject. **Fire-and-forget analytics with zero gameplay effect** — only subscribes to events and
+writes to disk. Appends one JSON object per line to
+`Application.persistentDataPath/momentum_telemetry.jsonl` (compact manual JSON, not JsonUtility, so
+each line is one heterogeneous object). Single writer `WriteEvent` uses `File.AppendAllText` in a
+try/catch → warning; **never throws, never blocks, append-only (never truncates)**. Logs the full
+path once on first write. Every line carries `ts` (ISO-8601 UTC), `session` (a fresh GUID per Play,
+made in `Awake`), `type`, and an event payload. Refs auto-wire via `FindFirstObjectByType`.
+- **`[DefaultExecutionOrder(-100)]`** so its `OnEnable` subscribes to `OnFishLanded` **before**
+  `PlayerWallet` (which awards coins in its own handler) — guaranteeing a win logs `fight_end`
+  **before** the `coins` line.
+- Event lines: `session_start` (once, in `Start`); `cast` (← `FishingSpotInteractor.OnCastStarted`,
+  carries target x/y/z); `bite_outcome` (← `FishingBiteController.OnBiteResolved`: fish/nothing/junk,
+  junk carries its message); `fight_start` (**derived** — emitted right after a `"fish"` bite, so the
+  protected controller is untouched); `fight_end` (win ← `OnFishLanded` with species+rarity; loss ←
+  `OnFightClosed` firing with no preceding `OnFishLanded`, tracked by `wonThisFight`); `coins`
+  (← `OnBalanceChanged`, **zero-delta restore events skipped**); `loadout` (← `OnLoadoutChanged`,
+  equipped name — startup emits 1–2 lines for the default/restored lure, intentional). All subscribe
+  in `OnEnable`, release in `OnDisable`; no polling. Has a `[ContextMenu]` `FireTestEvent` dev helper.
+
 ### `CoinHud.cs` — coin counter overlay
 `Assets/Scripts/Fishing/CoinHud.cs`. Also on **`FishingTension`** (`[RequireComponent(PlayerWallet)]`).
 Its own always-visible `ScreenSpaceOverlay` canvas (`sortingOrder = 100`, above the fight
@@ -214,6 +235,10 @@ If the **closest** hit is on the **Water layer** (dock/ground correctly occlude 
 `bite` (the `FishingBiteController`) auto-wires in `Awake()` via `GetComponent` (same pattern as
 `castController`); Inspector-overridable.
 
+**Added for telemetry (approved additive hook):** `public event Action<Vector3> OnCastStarted` —
+fired the instant a valid water click is committed (right where `fishingActive = true`), carrying the
+target hit point. Invoke-only; no gameplay behaviour depends on it. Drives the `cast` telemetry line.
+
 `player` is now typed `TopDownController` (was `FirstPersonController`). The center crosshair
 (`drawCrosshair`) is disabled in the Inspector since aim is now the mouse cursor.
 Auto-wires the cast controller in `Awake()` via `GetComponent`; other refs set in Inspector.
@@ -242,6 +267,11 @@ On `Player`. The **bite-wait phase** inserted between the lure landing and the f
 - **Nothing/junk:** waits the **FULL `maxWait`** (not the fish roll), shows a brief screen message
   for `noCatchMessageDuration` (public, default 2s), then `onNoCatch` runs. Junk is **flavor text
   ONLY** — no coins, no inventory, nothing spawned.
+
+**Added for telemetry (approved additive hook):** `public event Action<string,string> OnBiteResolved`
+— fired when the outcome surfaces: `(outcomeKey, junkMessage)` where `outcomeKey` is
+`"fish"|"nothing"|"junk"` (junk carries its flavor line, else null). Invoke-only; drives the
+`bite_outcome` line (and `TelemetryService` derives `fight_start` from the `"fish"` case).
 
 **Visuals (built in code):**
 - Thought bubble: world-space, parented to `CharacterVisual` at `bubbleLocalOffset` (public,

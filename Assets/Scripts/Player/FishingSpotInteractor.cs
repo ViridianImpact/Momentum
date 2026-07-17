@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Momentum.Fishing;
 
@@ -45,6 +46,12 @@ namespace Momentum.Player
         bool fishingActive;
         Vector3 capturedPosition;
 
+        /// <summary>Additive telemetry hook: fired the instant a valid water click is confirmed and a
+        /// cast is committed (before the cast animation / bite phase), carrying the target hit point.
+        /// TelemetryService subscribes to this to log the 'cast' event. No gameplay behaviour depends
+        /// on it — it is invoke-only.</summary>
+        public event Action<Vector3> OnCastStarted;
+
         void Awake()
         {
             if (cam == null) cam = Camera.main;
@@ -79,6 +86,7 @@ namespace Momentum.Player
                 {
                     capturedPosition = transform.position; // where the player stood when they cast
                     fishingActive = true; // blocks re-trigger for the whole cast + fight
+                    OnCastStarted?.Invoke(hit.point); // additive telemetry hook (no behaviour change)
                     if (player != null)
                     {
                         player.FaceTowards(hit.point);        // turn the character toward the clicked water
