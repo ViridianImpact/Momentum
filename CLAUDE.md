@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+> **If you are using Cline instead of Claude Code:** read `.clinerules` (the Cline-native entry
+> point) instead of this file. `.clinerules` contains the same rules and workflow adapted for
+> Cline's session-injection model. This file is the Claude Code-native entry point.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this
 repository.
 

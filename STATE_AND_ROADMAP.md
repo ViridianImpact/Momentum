@@ -6,13 +6,13 @@
 
 ---
 
-## Completion: **~12% overall** (wife-complete milestone: ~15%)
+## Completion: **~20% overall** (wife-complete milestone: ~15%)
 
-Not a discouraging number — a clarifying one. The 12% that exists is the *hard-to-fake*
-12%: a working, feel-tested core loop end-to-end. Most of the remaining 88% splits into
-(a) systems code the AI agent builds cheaply and reliably, and (b) content/art/balancing
-that costs developer-and-wife time, not tokens. The plan below is ordered so that (a)
-never blocks (b).
+Not a discouraging number — a clarifying one. The 20% that exists is the *hard-to-fake*
+20%: a working, feel-tested core loop end-to-end plus persistence and telemetry (M1).
+Most of the remaining 80% splits into (a) systems code the AI agent builds cheaply and
+reliably, and (b) content/art/balancing that costs developer-and-wife time, not tokens.
+The plan below is ordered so that (a) never blocks (b).
 
 | System | State | % |
 |---|---|---|
@@ -23,8 +23,8 @@ never blocks (b).
 | World/map | One sandbox plane + dock vs. a 4-region walkable map | 5% |
 | Species content | 3/50 as data; 0/50 art; no quality/size roll | 5% |
 | NPC/quest system | Nothing exists | 0% |
-| Persistence (save/load) | Nothing exists (explicitly session-only) | 0% |
-| Telemetry | Nothing exists | 0% |
+| Persistence (save/load) | JSON save/load (coins, lure loadout, schema v1); auto-saves on change. Grows with each new system. | 95% |
+| Telemetry | JSONL event log (7 event types); append-only, fire-and-forget. Grows with new systems. | 90% |
 | Audio | Nothing exists | 0% |
 | Menus/settings/pause | Nothing exists | 0% |
 | Art pipeline (sprite-in-3D) | Direction chosen; nothing built or tested | 0% |
@@ -43,11 +43,14 @@ its own `/clear`. Order matters — it is dependency-driven, not preference-driv
 by collision check; final name due before M12.
 ⬜ Create `LICENSES.md`. ⬜ Decide save path (`Application.persistentDataPath`, JSON).
 
-**M1 — Save system + telemetry** *(AI-strong, ~2–3 prompts)*
-JSON save/load service (coins, owned lures, equipped lure to start — schema grows with
-each system). JSONL event log (cast, fight start/end, species, result, coins).
-**Before M2**, because the catch-table refactor should be born persistent, and because
-every balancing decision afterward is data-driven.
+**M1 — Save system + telemetry** ✅ *(shipped 2026-07)*
+JSON save/load service (`SaveService`, `momentum_save.json` — coins, owned lures,
+equipped lure, schema v1) + JSONL event log (`TelemetryService`,
+`momentum_telemetry.jsonl` — 7 event types: `session_start`, `cast`, `bite_outcome`,
+`fight_start`, `fight_end`, `coins`, `loadout`). Additive hooks on `PlayerWallet`,
+`LureShop`, `FishingSpotInteractor`, and `FishingBiteController` — protected file
+untouched. Auto-saves on every meaningful change; restore path with zero-delta
+(no UI flash). Both services live on the `SaveService` GameObject in `Sandbox`.
 
 **M2 — Catch-table refactor** *(AI-strong, the central data system, ~3 prompts)*
 Species registry (50-capable): rarity tier, tier stat-template + offsets, region pool

@@ -1,0 +1,42 @@
+# .clinerules — Cline AI Assistant Rules for Momentum (Unity Fishing Game)
+
+# This is the Cline-native entry point. If you're using Claude Code, read CLAUDE.md instead.
+# If you're using Cline, this file is auto-injected at session start.
+# Before any implementation task, also read: VISION.md, ARCHITECTURE.md, STATE_AND_ROADMAP.md
+
+## Project identity
+- Unity 6000.3.18f1 (Unity 6), Built-in Render Pipeline
+- Assets/Scripts/Fishing/ contains all fishing game code
+- Repo root = canonical Unity project root
+- No npm/make-style build toolchain — Editor-driven only
+
+## HARD RULES — never override
+1. **Never delete** — comment out, disable, or prefix with _deprecated_ instead
+2. **Stop on instruction conflicts** — ask, don't assume
+3. **When unsure, treat as off-limits** — burden of proof is on proceeding
+4. **No new dependencies** — use Coroutines, AnimationCurve, LineRenderer, Mathf
+5. **No silent edits to protected files** — report with diff, flagged prominently
+   See ARCHITECTURE.md for protected file list
+
+## WORKFLOW
+1. **Discovery first** — read relevant files, report what exists, present plan, wait for go-ahead
+2. **Implement**
+3. **Verify in Play mode** — confirm acceptance criteria, report all console errors honestly
+4. **Report** — what was built, changed, flagged, what to verify
+
+## GIT
+- Before starting: `git add -A && git commit -m "checkpoint before [feature]"`
+- After verified working: `git add -A && git commit -m "[what was built]"` then `git push`
+- Commit often — every commit is a safety net for the hard rules
+
+## KEY FILES — read these on-demand
+- CLAUDE.md — full workflow detail, error recovery, avoidance patterns (Claude Code native)
+- VISION.md — closed design bible, game design decisions
+- ARCHITECTURE.md — technical truth, protected files, API contracts, known constraints
+- STATE_AND_ROADMAP.md — current implementation status, what's built, what's next
+
+## ENVIRONMENT
+- Built-in RP only — use Standard shader, never URP shader names (returns null → magenta/crash)
+- Legacy Input Manager
+- Unity MCP tools available for scene/prefab/component changes — prefer over raw YAML edits
+- .meta files must stay in sync with assets
