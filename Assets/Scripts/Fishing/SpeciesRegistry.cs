@@ -3,277 +3,224 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace Fishing
+namespace Momentum.Fishing
 {
     /// <summary>
-    /// Central species catalogue and catch-table engine.
-    /// Replaces the hard-coded per-species weights in CatfishSpecies with a
-    /// data-driven tier → weight → pick pipeline.
-    /// NOT yet wired into the fight — FishingTensionController still calls the
-    /// old path. Wiring happens in Prompt 3.
+    /// Central species catalogue and catch-roll system (M2 refactor).
+    /// Static C# class — NOT ScriptableObject, NOT JSON.
+    /// Not yet wired into fight logic; FishingTensionController still uses the old path.
     /// </summary>
     public static class SpeciesRegistry
     {
         // =====================================================================
-        // SpeciesEntry
+        // Tier-level Stat Templates (indexed by (int)FishRarity)
+        // Plausible defaults — will be tuned later.
         // =====================================================================
 
-        [Serializable]
+        public static readonly StatTemplate[] TierTemplates = new StatTemplate[6]
+        {
+            // Common — low tension, short fight, no QTEs
+            new StatTemplate
+            {
+                maxTension      = 0.30f,
+                fightDuration   = 8f,
+                qteFrequency    = 0f,
+                progressPerReel = 0.08f,
+                effortFrequency = 0.3f,
+                effortIntensity = 0.30f
+            },
+            // Uncommon — moderate tension, moderate fight
+            new StatTemplate
+            {
+                maxTension      = 0.50f,
+                fightDuration   = 15f,
+                qteFrequency    = 0.05f,
+                progressPerReel = 0.07f,
+                effortFrequency = 0.5f,
+                effortIntensity = 0.50f
+            },
+            // Rare — high tension, long fight, occasional QTEs
+            new StatTemplate
+            {
+                maxTension      = 0.70f,
+                fightDuration   = 25f,
+                qteFrequency    = 0.10f,
+                progressPerReel = 0.06f,
+                effortFrequency = 0.7f,
+                effortIntensity = 0.70f
+            },
+            // Epic — very high tension, very long fight, frequent QTEs
+            new StatTemplate
+            {
+                maxTension      = 0.85f,
+                fightDuration   = 40f,
+                qteFrequency    = 0.20f,
+                progressPerReel = 0.05f,
+                effortFrequency = 0.9f,
+                effortIntensity = 0.85f
+            },
+            // Legendary — extreme tension, longest fight, constant QTEs
+            new StatTemplate
+            {
+                maxTension      = 0.95f,
+                fightDuration   = 60f,
+                qteFrequency    = 0.35f,
+                progressPerReel = 0.04f,
+                effortFrequency = 1.2f,
+                effortIntensity = 1.00f
+            },
+            // Mythic — same as Legendary for now (reserved slot, no species uses it)
+            new StatTemplate
+            {
+                maxTension      = 0.95f,
+                fightDuration   = 60f,
+                qteFrequency    = 0.35f,
+                progressPerReel = 0.04f,
+                effortFrequency = 1.2f,
+                effortIntensity = 1.00f
+            }
+        };
+
+        // =====================================================================
+        // Species Entry
+        // =====================================================================
+
         public class SpeciesEntry
         {
             public string displayName;
             public Color swatchColor;
             public FishRarity rarity;
-            public Region regions;          // bitmask
-            public GearTier minRodTier;     // floor
-            public GearTier maxRodTier;     // ceiling
-            public string[] baitTags;       // e.g. ["worm"], ["minnow"], ["insect"]
-            public float tierWeight = 1.0f; // relative weight WITHIN rarity tier
+            public Region regions;           // bitmask
+            public GearTier minRodTier;      // floor
+            public GearTier maxRodTier;      // ceiling
+            public string[] baitTags;        // e.g. ["worm"], ["minnow"], ["insect"]
+            public float tierWeight = 1.0f;  // relative weight WITHIN rarity tier
             public QualityRoll qualityRoll;
             public StatTemplate statOffsets; // per-species offsets on top of tier template
         }
 
         // =====================================================================
-        // Tier Templates (indexed by (int)FishRarity)
+        // Catalogue — 3 initial species matching Whiskers / Old Tom / Spotmouth
         // =====================================================================
 
-        /// <summary>
-        /// Plausible defaults for all 6 tiers. These will be tuned later.
-        /// Indexed by (int)FishRarity: Common=0, Uncommon=1, Rare=2,
-        /// Epic=3, Legendary=4, Mythic=5.
-        /// </summary>
-        public static StatTemplate[] TierTemplates = new StatTemplate[6]
+        public static readonly IReadOnlyList<SpeciesEntry> Catalogue = new List<SpeciesEntry>
         {
-            // Common — low tension, short fight, no QTEs
-            new StatTemplate
-            {
-                baseTension = 40f,
-                tensionGrowthRate = 8f,
-                maxTension = 100f,
-                fightDurationSeconds = 12f,
-                qteFrequency = 0f,
-                qteDifficulty = 0f,
-                escapeChance = 0.05f,
-                thrashIntensity = 0.3f,
-                thrashFrequency = 0.2f,
-            },
-            // Uncommon — moderate tension, moderate fight
-            new StatTemplate
-            {
-                baseTension = 55f,
-                tensionGrowthRate = 12f,
-                maxTension = 120f,
-                fightDurationSeconds = 20f,
-                qteFrequency = 0.15f,
-                qteDifficulty = 0.2f,
-                escapeChance = 0.08f,
-                thrashIntensity = 0.5f,
-                thrashFrequency = 0.35f,
-            },
-            // Rare — high tension, long fight, occasional QTEs
-            new StatTemplate
-            {
-                baseTension = 70f,
-                tensionGrowthRate = 16f,
-                maxTension = 140f,
-                fightDurationSeconds = 30f,
-                qteFrequency = 0.3f,
-                qteDifficulty = 0.4f,
-                escapeChance = 0.12f,
-                thrashIntensity = 0.7f,
-                thrashFrequency = 0.5f,
-            },
-            // Epic — very high tension, very long fight, frequent QTEs
-            new StatTemplate
-            {
-                baseTension = 85f,
-                tensionGrowthRate = 20f,
-                maxTension = 160f,
-                fightDurationSeconds = 42f,
-                qteFrequency = 0.5f,
-                qteDifficulty = 0.6f,
-                escapeChance = 0.16f,
-                thrashIntensity = 0.85f,
-                thrashFrequency = 0.65f,
-            },
-            // Legendary — extreme tension, longest fight, constant QTEs
-            new StatTemplate
-            {
-                baseTension = 100f,
-                tensionGrowthRate = 25f,
-                maxTension = 180f,
-                fightDurationSeconds = 55f,
-                qteFrequency = 0.7f,
-                qteDifficulty = 0.8f,
-                escapeChance = 0.20f,
-                thrashIntensity = 1.0f,
-                thrashFrequency = 0.8f,
-            },
-            // Mythic — same as Legendary for now (reserved)
-            new StatTemplate
-            {
-                baseTension = 100f,
-                tensionGrowthRate = 25f,
-                maxTension = 180f,
-                fightDurationSeconds = 55f,
-                qteFrequency = 0.7f,
-                qteDifficulty = 0.8f,
-                escapeChance = 0.20f,
-                thrashIntensity = 1.0f,
-                thrashFrequency = 0.8f,
-            },
-        };
-
-        // =====================================================================
-        // Catalogue
-        // =====================================================================
-
-        /// <summary>
-        /// All registered species. Add new species here as they are designed.
-        /// </summary>
-        public static IReadOnlyList<SpeciesEntry> Catalogue { get; } = new List<SpeciesEntry>
-        {
-            // ---- Whiskers (Common) ----
             new SpeciesEntry
             {
                 displayName = "Whiskers",
-                swatchColor = new Color(0.55f, 0.70f, 0.55f), // muted green
-                rarity = FishRarity.Common,
-                regions = Region.All,
-                minRodTier = GearTier.T1,
-                maxRodTier = GearTier.T5,
-                baitTags = new[] { "worm" },
-                tierWeight = 1.0f,
-                qualityRoll = new QualityRoll
-                {
-                    sizeMultiplierMin = 0.8f,
-                    sizeMultiplierMax = 1.2f,
-                    weightMultiplierMin = 0.8f,
-                    weightMultiplierMax = 1.2f,
-                    fightModifierMin = 0.9f,
-                    fightModifierMax = 1.1f,
-                },
-                statOffsets = new StatTemplate(), // zero offsets
+                swatchColor = new Color(0.60f, 0.70f, 0.25f),  // greenish catfish
+                rarity      = FishRarity.Common,
+                regions     = Region.All,
+                minRodTier  = GearTier.T1,
+                maxRodTier  = GearTier.T5,
+                baitTags    = new[] { "worm" },
+                tierWeight  = 1.0f,
+                qualityRoll = new QualityRoll { minWeightKg = 0.5f, maxWeightKg = 3.0f,
+                                                minHeightCm = 20f, maxHeightCm = 45f,
+                                                qualityMultiplier = 1.0f },
+                statOffsets = new StatTemplate()
             },
-            // ---- Old Tom (Uncommon) ----
             new SpeciesEntry
             {
                 displayName = "Old Tom",
-                swatchColor = new Color(0.65f, 0.50f, 0.35f), // brown
-                rarity = FishRarity.Uncommon,
-                regions = Region.All,
-                minRodTier = GearTier.T1,
-                maxRodTier = GearTier.T5,
-                baitTags = new[] { "worm", "minnow" },
-                tierWeight = 1.0f,
-                qualityRoll = new QualityRoll
-                {
-                    sizeMultiplierMin = 0.9f,
-                    sizeMultiplierMax = 1.3f,
-                    weightMultiplierMin = 0.9f,
-                    weightMultiplierMax = 1.3f,
-                    fightModifierMin = 0.95f,
-                    fightModifierMax = 1.15f,
-                },
-                statOffsets = new StatTemplate
-                {
-                    baseTension = 5f,
-                    fightDurationSeconds = 3f,
-                },
+                swatchColor = new Color(0.55f, 0.50f, 0.35f),  // brownish
+                rarity      = FishRarity.Uncommon,
+                regions     = Region.All,
+                minRodTier  = GearTier.T1,
+                maxRodTier  = GearTier.T5,
+                baitTags    = new[] { "worm", "minnow" },
+                tierWeight  = 1.0f,
+                qualityRoll = new QualityRoll { minWeightKg = 2.0f, maxWeightKg = 8.0f,
+                                                minHeightCm = 30f, maxHeightCm = 70f,
+                                                qualityMultiplier = 1.5f },
+                statOffsets = new StatTemplate()
             },
-            // ---- Spotmouth (Rare) ----
             new SpeciesEntry
             {
                 displayName = "Spotmouth",
-                swatchColor = new Color(0.85f, 0.35f, 0.35f), // reddish
-                rarity = FishRarity.Rare,
-                regions = Region.All,
-                minRodTier = GearTier.T2,
-                maxRodTier = GearTier.T5,
-                baitTags = new[] { "minnow" },
-                tierWeight = 1.0f,
-                qualityRoll = new QualityRoll
-                {
-                    sizeMultiplierMin = 0.95f,
-                    sizeMultiplierMax = 1.4f,
-                    weightMultiplierMin = 0.95f,
-                    weightMultiplierMax = 1.4f,
-                    fightModifierMin = 0.9f,
-                    fightModifierMax = 1.2f,
-                },
-                statOffsets = new StatTemplate
-                {
-                    baseTension = 10f,
-                    tensionGrowthRate = 2f,
-                    fightDurationSeconds = 5f,
-                    qteFrequency = 0.05f,
-                },
-            },
+                swatchColor = new Color(0.75f, 0.40f, 0.20f),  // orange-spotted
+                rarity      = FishRarity.Rare,
+                regions     = Region.All,
+                minRodTier  = GearTier.T2,
+                maxRodTier  = GearTier.T5,
+                baitTags    = new[] { "minnow" },
+                tierWeight  = 1.0f,
+                qualityRoll = new QualityRoll { minWeightKg = 4.0f, maxWeightKg = 15.0f,
+                                                minHeightCm = 40f, maxHeightCm = 90f,
+                                                qualityMultiplier = 2.0f },
+                statOffsets = new StatTemplate()
+            }
         };
 
         // =====================================================================
-        // Pick() — the catch-table engine
+        // Pick() — full catch-roll algorithm
         // =====================================================================
 
         /// <summary>
-        /// Select a species given the current region, rod tier, lure, and
-        /// optional bait. Returns null if no species matches the filters.
+        /// Roll a species from the catalogue given the current region, rod tier, lure, and optional bait.
+        /// Returns null if no species matches the filters.
         /// </summary>
-        /// <param name="region">The region the player is fishing in.</param>
-        /// <param name="rodTier">The tier of the equipped rod.</param>
-        /// <param name="lure">The equipped lure (provides rarityTierModifiers).</param>
-        /// <param name="bait">Optional bait. If null, bait filtering is skipped (M4-ready).</param>
         public static SpeciesEntry Pick(Region region, GearTier rodTier, LureData lure, BaitData? bait = null)
         {
-            // 1. Filter by region, rod tier band, and optional bait
+            // ---- Step 1: filter by region, rod tier band, and optionally bait ----
             List<SpeciesEntry> filtered = new List<SpeciesEntry>();
-            foreach (var species in Catalogue)
+            foreach (var s in Catalogue)
             {
-                if (!species.regions.HasFlag(region))
+                if (!s.regions.HasFlag(region))
                     continue;
-                if (rodTier < species.minRodTier)
+                if (rodTier < s.minRodTier)
                     continue;
-                if (rodTier > species.maxRodTier)
+                if (rodTier > s.maxRodTier)
                     continue;
-                if (bait.HasValue && bait.Value.tags != null && bait.Value.tags.Length > 0)
+
+                // Bait filter — skipped if bait is null (M4-ready)
+                if (bait != null && bait.tags != null && bait.tags.Length > 0)
                 {
-                    if (!species.baitTags.Intersect(bait.Value.tags).Any())
+                    bool hasMatchingTag = false;
+                    if (s.baitTags != null)
+                    {
+                        foreach (var speciesTag in s.baitTags)
+                        {
+                            foreach (var baitTag in bait.tags)
+                            {
+                                if (speciesTag == baitTag)
+                                {
+                                    hasMatchingTag = true;
+                                    break;
+                                }
+                            }
+                            if (hasMatchingTag)
+                                break;
+                        }
+                    }
+                    if (!hasMatchingTag)
                         continue;
                 }
-                filtered.Add(species);
+
+                filtered.Add(s);
             }
 
-            // 2. If filtered pool is empty, return null
             if (filtered.Count == 0)
                 return null;
 
-            // 3. Roll rarity tier using lure.rarityTierModifiers
-            float[] tierMods = lure.rarityTierModifiers;
-            int tierCount = tierMods != null ? tierMods.Length : 0;
-            float[] tierProbs = new float[6]; // one per FishRarity value
-
-            if (tierCount > 0)
+            // ---- Step 2: roll rarity tier ----
+            float[] tierMods = lure?.rarityTierModifiers;
+            float[] clamped = new float[6];
+            if (tierMods != null && tierMods.Length > 0)
             {
-                // Clamp negatives to 0
                 for (int i = 0; i < 6; i++)
                 {
-                    float val = i < tierCount ? tierMods[i] : 0f;
-                    tierProbs[i] = Mathf.Max(0f, val);
+                    if (i < tierMods.Length)
+                        clamped[i] = Mathf.Max(0f, tierMods[i]);
                 }
             }
-            else
-            {
-                // No modifiers — uniform
-                for (int i = 0; i < 6; i++)
-                    tierProbs[i] = 1f;
-            }
 
-            float tierSum = 0f;
+            float sum = 0f;
             for (int i = 0; i < 6; i++)
-                tierSum += tierProbs[i];
+                sum += clamped[i];
 
             FishRarity rolledTier;
-            if (tierSum <= 0f)
+            if (sum <= 0f)
             {
                 // Uniform roll across all tiers
                 rolledTier = (FishRarity)UnityEngine.Random.Range(0, 6);
@@ -281,74 +228,57 @@ namespace Fishing
             else
             {
                 // Weighted random
-                float roll = UnityEngine.Random.Range(0f, tierSum);
-                float accum = 0f;
-                int chosen = 0;
+                float[] normalized = new float[6];
                 for (int i = 0; i < 6; i++)
-                {
-                    accum += tierProbs[i];
-                    if (roll <= accum)
-                    {
-                        chosen = i;
-                        break;
-                    }
-                }
-                rolledTier = (FishRarity)chosen;
+                    normalized[i] = clamped[i] / sum;
+                rolledTier = (FishRarity)PickWeightedIndex(normalized);
             }
 
-            // 4. Filter pool to species where species.rarity == rolledTier
+            // ---- Step 3: filter to rolled tier ----
             List<SpeciesEntry> tierPool = new List<SpeciesEntry>();
-            foreach (var species in filtered)
+            foreach (var s in filtered)
             {
-                if (species.rarity == rolledTier)
-                    tierPool.Add(species);
+                if (s.rarity == rolledTier)
+                    tierPool.Add(s);
             }
 
-            // 5. If tier pool is empty, fall back through tiers
+            // ---- Step 4: fallback if tier pool empty ----
             if (tierPool.Count == 0)
             {
-                FishRarity[] fallbackOrder =
+                // Iterate tiers in ascending order, find first with species
+                for (int t = 0; t < 6; t++)
                 {
-                    FishRarity.Common,
-                    FishRarity.Uncommon,
-                    FishRarity.Rare,
-                    FishRarity.Epic,
-                    FishRarity.Legendary,
-                };
-                foreach (var fallbackTier in fallbackOrder)
-                {
-                    foreach (var species in filtered)
+                    FishRarity fallbackTier = (FishRarity)t;
+                    foreach (var s in filtered)
                     {
-                        if (species.rarity == fallbackTier)
-                            tierPool.Add(species);
+                        if (s.rarity == fallbackTier)
+                            tierPool.Add(s);
                     }
                     if (tierPool.Count > 0)
                         break;
                 }
             }
 
-            // If still empty (shouldn't happen since filtered was non-empty), return null
             if (tierPool.Count == 0)
-                return null;
+                return null; // safety net
 
-            // 6. Weight each species by tierWeight
-            float[] weights = new float[tierPool.Count];
+            // ---- Step 5: weighted pick within tier pool ----
+            float[] tierWeights = new float[tierPool.Count];
             for (int i = 0; i < tierPool.Count; i++)
-                weights[i] = tierPool[i].tierWeight;
+                tierWeights[i] = tierPool[i].tierWeight;
 
-            // 7. Weighted random pick
-            int pickedIndex = PickWeightedIndex(weights);
-            return tierPool[pickedIndex];
+            int index = PickWeightedIndex(tierWeights);
+            return tierPool[index];
         }
 
         // =====================================================================
-        // PickWeightedIndex helper
+        // Weighted Random Helper
         // =====================================================================
 
         /// <summary>
         /// Given an array of non-negative weights, returns a random index
-        /// selected with probability proportional to each weight.
-        /// If all weights are zero, returns a uniform random index.
+        /// with probability proportional to weight.  0-weight items are never picked.
+        /// If all weights are 0, returns a uniform random index.
         /// </summary>
         private static int PickWeightedIndex(float[] weights)
         {
@@ -357,21 +287,21 @@ namespace Fishing
 
             float total = 0f;
             for (int i = 0; i < weights.Length; i++)
-                total += Mathf.Max(0f, weights[i]);
+                total += weights[i];
 
             if (total <= 0f)
                 return UnityEngine.Random.Range(0, weights.Length);
 
-            float roll = UnityEngine.Random.Range(0f, total);
-            float accum = 0f;
+            float roll = UnityEngine.Random.value * total;
+            float cumulative = 0f;
             for (int i = 0; i < weights.Length; i++)
             {
-                accum += Mathf.Max(0f, weights[i]);
-                if (roll <= accum)
+                cumulative += weights[i];
+                if (roll <= cumulative)
                     return i;
             }
 
-            return weights.Length - 1; // fallback
+            return weights.Length - 1; // fallback (floating-point safety)
         }
     }
 }
