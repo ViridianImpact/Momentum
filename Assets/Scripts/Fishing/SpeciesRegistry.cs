@@ -97,6 +97,11 @@ namespace Momentum.Fishing
             public float tierWeight = 1.0f;  // relative weight WITHIN rarity tier
             public QualityRoll qualityRoll;
             public StatTemplate statOffsets; // per-species offsets on top of tier template
+
+            public CatfishSpecies ToCatfishSpecies()
+            {
+                return new CatfishSpecies(displayName, swatchColor, rarity);
+            }
         }
 
         // =====================================================================

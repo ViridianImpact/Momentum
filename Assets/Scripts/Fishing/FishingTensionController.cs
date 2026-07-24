@@ -249,9 +249,10 @@ namespace Momentum.Fishing
                 ? fishCatalogue[Mathf.Clamp(startingFishIndex, 0, fishCatalogue.Count - 1)]
                 : new FishData();
 
-            // Display-only identity for this catch. Does NOT touch fight stats above —
-            // every catfish uses the same FishData, so difficulty is unchanged.
-            caughtSpecies = CatfishSpecies.PickRandom();
+        // Display-only identity for this catch. Does NOT touch fight stats above —
+        // every catfish uses the same FishData, so difficulty is unchanged.
+        caughtSpecies = SpeciesRegistry.Pick(RegionDetector.GetRegion(transform.position), GearTier.Tier1, null, null)
+            ?.ToCatfishSpecies() ?? CatfishSpecies.PickRandom();
 
             playerReel = (safeZoneBottom + safeZoneTop) * 0.5f; // start centered in the green
             currentEffort = 0f;
