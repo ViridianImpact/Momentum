@@ -47,19 +47,31 @@ namespace Momentum.Fishing
             public float oldTomWeight = 25f;
             [Tooltip("Relative weight for Spotmouth (Rare).")]
             public float spotmouthWeight = 5f;
+
+            [Header("Rarity-tier modifiers (indexed by (int)FishRarity)")]
+            [Tooltip("Relative weight for each rarity tier when this lure is equipped. Higher = more likely to roll that tier. Zero or negative = impossible.")]
+            public float[] rarityTierModifiers = new float[6]
+            {
+                // Common  Uncommon  Rare  Epic  Legendary  Mythic
+                   1.0f,    0.8f,    0.3f, 0.0f, 0.0f,     0.0f
+            };
         }
 
         [Header("Shop stock (name / price / colour / species odds — tunable)")]
         public LureOption[] lures =
         {
             new LureOption { displayName = "Blue",   price = 0,   color = new Color(0.25f, 0.55f, 0.95f), ownedByDefault = true,
-                             whiskersWeight = 70f, oldTomWeight = 25f, spotmouthWeight =  5f },
+                             whiskersWeight = 70f, oldTomWeight = 25f, spotmouthWeight =  5f,
+                             rarityTierModifiers = new float[] { 1.0f, 0.6f, 0.15f, 0.0f, 0.0f, 0.0f } },
             new LureOption { displayName = "Red",    price = 50,  color = new Color(0.90f, 0.25f, 0.25f),
-                             whiskersWeight = 50f, oldTomWeight = 40f, spotmouthWeight = 10f },
+                             whiskersWeight = 50f, oldTomWeight = 40f, spotmouthWeight = 10f,
+                             rarityTierModifiers = new float[] { 0.7f, 0.8f, 0.3f, 0.0f, 0.0f, 0.0f } },
             new LureOption { displayName = "Purple", price = 150, color = new Color(0.62f, 0.28f, 0.85f),
-                             whiskersWeight = 30f, oldTomWeight = 45f, spotmouthWeight = 25f },
+                             whiskersWeight = 30f, oldTomWeight = 45f, spotmouthWeight = 25f,
+                             rarityTierModifiers = new float[] { 0.4f, 0.7f, 0.6f, 0.08f, 0.0f, 0.0f } },
             new LureOption { displayName = "Gold",   price = 400, color = new Color(0.95f, 0.80f, 0.25f),
-                             whiskersWeight = 15f, oldTomWeight = 40f, spotmouthWeight = 45f },
+                             whiskersWeight = 15f, oldTomWeight = 40f, spotmouthWeight = 45f,
+                             rarityTierModifiers = new float[] { 0.2f, 0.5f, 0.8f, 0.15f, 0.03f, 0.0f } },
         };
 
         [Header("References (auto-wired if left empty)")]

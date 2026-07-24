@@ -3,7 +3,9 @@ using UnityEngine;
 
 namespace Momentum.Fishing
 {
-    public enum FishRarity { Common, Uncommon, Rare, Epic, Legendary }
+    public enum FishRarity { Common, Uncommon, Rare, Epic, Legendary, Mythic }
+
+    public enum GearTier { Basic, Advanced, Pro, Master }
 
     /// <summary>
     /// Pure data describing one catchable fish. ALL fight behaviour is driven from
