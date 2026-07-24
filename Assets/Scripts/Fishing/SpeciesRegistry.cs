@@ -108,46 +108,43 @@ namespace Momentum.Fishing
             new SpeciesEntry
             {
                 displayName = "Whiskers",
-                swatchColor = new Color(0.60f, 0.70f, 0.25f),  // greenish catfish
+                swatchColor = new Color(0.55f, 0.45f, 0.30f),  // muddy tan
                 rarity      = FishRarity.Common,
                 regions     = Region.All,
-                minRodTier  = GearTier.T1,
-                maxRodTier  = GearTier.T5,
+                minRodTier  = GearTier.Tier1,
+                maxRodTier  = GearTier.Tier5,
                 baitTags    = new[] { "worm" },
                 tierWeight  = 1.0f,
-                qualityRoll = new QualityRoll { minWeightKg = 0.5f, maxWeightKg = 3.0f,
-                                                minHeightCm = 20f, maxHeightCm = 45f,
-                                                qualityMultiplier = 1.0f },
+                qualityRoll = new QualityRoll { sizeFactor = 0.8f, weightFactor = 1.0f,
+                                                conditionFactor = 1.0f },
                 statOffsets = new StatTemplate()
             },
             new SpeciesEntry
             {
                 displayName = "Old Tom",
-                swatchColor = new Color(0.55f, 0.50f, 0.35f),  // brownish
+                swatchColor = new Color(0.35f, 0.38f, 0.42f),  // slate grey
                 rarity      = FishRarity.Uncommon,
                 regions     = Region.All,
-                minRodTier  = GearTier.T1,
-                maxRodTier  = GearTier.T5,
+                minRodTier  = GearTier.Tier1,
+                maxRodTier  = GearTier.Tier5,
                 baitTags    = new[] { "worm", "minnow" },
                 tierWeight  = 1.0f,
-                qualityRoll = new QualityRoll { minWeightKg = 2.0f, maxWeightKg = 8.0f,
-                                                minHeightCm = 30f, maxHeightCm = 70f,
-                                                qualityMultiplier = 1.5f },
+                qualityRoll = new QualityRoll { sizeFactor = 0.9f, weightFactor = 1.0f,
+                                                conditionFactor = 1.0f },
                 statOffsets = new StatTemplate()
             },
             new SpeciesEntry
             {
                 displayName = "Spotmouth",
-                swatchColor = new Color(0.75f, 0.40f, 0.20f),  // orange-spotted
+                swatchColor = new Color(0.80f, 0.70f, 0.25f),  // spotted yellow
                 rarity      = FishRarity.Rare,
                 regions     = Region.All,
-                minRodTier  = GearTier.T2,
-                maxRodTier  = GearTier.T5,
+                minRodTier  = GearTier.Tier2,
+                maxRodTier  = GearTier.Tier5,
                 baitTags    = new[] { "minnow" },
                 tierWeight  = 1.0f,
-                qualityRoll = new QualityRoll { minWeightKg = 4.0f, maxWeightKg = 15.0f,
-                                                minHeightCm = 40f, maxHeightCm = 90f,
-                                                qualityMultiplier = 2.0f },
+                qualityRoll = new QualityRoll { sizeFactor = 1.0f, weightFactor = 1.0f,
+                                                conditionFactor = 1.0f },
                 statOffsets = new StatTemplate()
             }
         };
